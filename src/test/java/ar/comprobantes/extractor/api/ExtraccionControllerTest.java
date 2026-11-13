@@ -4,7 +4,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -130,5 +132,27 @@ class ExtraccionControllerTest {
             .andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.detail").value("Error interno."))
             .andExpect(content().string(not(containsString("secreto"))));
+    }
+
+    @Test
+    void getSobreSyncEs405() throws Exception {
+        mvc.perform(get("/api/v1/extracciones/sync"))
+            .andExpect(status().isMethodNotAllowed())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.detail").value("Método no permitido."));
+    }
+
+    @Test
+    void postJsonEs415() throws Exception {
+        mvc.perform(post("/api/v1/extracciones/sync").contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isUnsupportedMediaType())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void urlDesconocidaEs404() throws Exception {
+        mvc.perform(get("/no-existe"))
+            .andExpect(status().isNotFound())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
     }
 }

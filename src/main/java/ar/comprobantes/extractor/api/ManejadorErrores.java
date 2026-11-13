@@ -1,6 +1,7 @@
 package ar.comprobantes.extractor.api;
 
 import ar.comprobantes.extractor.error.ExtraccionException;
+import jakarta.servlet.ServletException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -8,6 +9,8 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.ErrorResponse;
+import org.springframework.web.ErrorResponseException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -50,9 +53,45 @@ public class ManejadorErrores {
             "La solicitud debe ser multipart/form-data con las partes 'documento' y 'solicitud'."));
     }
 
+    /** Errores propios de Spring MVC (405, 415, 404, ...): conservan su status con un detalle genérico. */
+    @ExceptionHandler({ServletException.class, ErrorResponseException.class})
+    ResponseEntity<ProblemDetail> framework(Exception e) {
+        if (!(e instanceof ErrorResponse er)) {
+            return inesperado(e);
+        }
+        HttpStatusCode status = er.getStatusCode();
+        String detalle;
+        switch (status.value()) {
+            case 404 -> detalle = "Recurso no encontrado.";
+            case 405 -> detalle = "Método no permitido.";
+            case 415 -> detalle = "Tipo de contenido no soportado.";
+            default -> detalle = status.is4xxClientError() ? "Solicitud inválida." : "Error interno.";
+        }
+        String titulo = status.is4xxClientError() ? "Solicitud inválida" : "Error interno";
+        return responder(e, problema(status, titulo, detalle));
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> inesperado(Exception e) {
-        return responder(e, problema(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", "Error interno."));
+        // Sin mensajes ni throwable: solo cadena de clases y primeros frames de la causa raíz.
+        StringBuilder cadena = new StringBuilder();
+        Throwable raiz = e;
+        for (Throwable t = e; t != null && cadena.length() < 500; t = t.getCause()) {
+            if (cadena.length() > 0) {
+                cadena.append(" <- ");
+            }
+            cadena.append(t.getClass().getSimpleName());
+            raiz = t;
+        }
+        StringBuilder frames = new StringBuilder();
+        StackTraceElement[] st = raiz.getStackTrace();
+        for (int i = 0; i < Math.min(5, st.length); i++) {
+            frames.append("\n  ").append(st[i].getClassName()).append('.').append(st[i].getMethodName())
+                .append(':').append(st[i].getLineNumber());
+        }
+        log.error("Error interno inesperado: causas={} frames:{}", cadena, frames);
+        return ResponseEntity.status(500).contentType(MediaType.APPLICATION_PROBLEM_JSON)
+            .body(problema(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", "Error interno."));
     }
 
     private static ProblemDetail problema(HttpStatusCode status, String titulo, String detalle) {

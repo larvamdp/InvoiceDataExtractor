@@ -71,4 +71,14 @@ class LogsSinContenidoTest {
         assertThat(salida.getAll()).contains("Solicitud rechazada");
         sinSecretos(salida);
     }
+
+    @Test
+    void errorInesperadoLogueaClasesSinMensaje(CapturedOutput salida) throws Exception {
+        when(llm.modelo()).thenReturn("modelo-falso");
+        when(llm.completar(any(PromptLlm.class))).thenThrow(new IllegalStateException("secreto-" + SECRETO));
+        mvc.perform(peticion()).andExpect(status().isInternalServerError());
+        assertThat(salida.getAll()).contains("Error interno inesperado").contains("IllegalStateException")
+            .contains("ExtraccionService").doesNotContain("secreto-");
+        sinSecretos(salida);
+    }
 }
