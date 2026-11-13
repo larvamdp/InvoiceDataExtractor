@@ -1,0 +1,118 @@
+package ar.comprobantes.extractor.llm;
+
+import ar.comprobantes.extractor.config.ExtractorProperties;
+import ar.comprobantes.extractor.error.LlmNoDisponibleException;
+import ar.comprobantes.extractor.error.LlmTimeoutException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.net.SocketTimeoutException;
+import java.net.http.HttpClient;
+import java.net.http.HttpTimeoutException;
+import java.time.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+
+@Component
+public class OllamaLlmCliente implements LlmCliente {
+
+    private static final Logger log = LoggerFactory.getLogger(OllamaLlmCliente.class);
+    private static final String MSG_NO_DISPONIBLE = "El servicio de IA no está disponible.";
+    private static final String MSG_TIMEOUT = "El modelo excedió el tiempo máximo de respuesta.";
+
+    private final ExtractorProperties.Ollama config;
+    private final boolean logPrompts;
+    private final ObjectMapper mapper = new ObjectMapper();
+    private final RestClient restClient;
+
+    public OllamaLlmCliente(ExtractorProperties props) {
+        this.config = props.ollama();
+        this.logPrompts = props.debug().logPrompts();
+        HttpClient httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(10)).build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(config.timeout());
+        this.restClient = RestClient.builder().baseUrl(config.url()).requestFactory(factory).build();
+    }
+
+    @Override
+    public String modelo() {
+        return config.modelo();
+    }
+
+    @Override
+    public String completar(PromptLlm prompt) {
+        int cantImagenes = prompt.imagenesBase64() == null ? 0 : prompt.imagenesBase64().size();
+        ObjectNode cuerpo = armarCuerpo(prompt);
+        if (logPrompts) {
+            log.debug("ADVERTENCIA: extractor.debug.log-prompts activo, se registra contenido del documento. "
+                + "Prompt: sistema={} usuario={} [{} imagenes]", prompt.sistema(), prompt.usuario(), cantImagenes);
+        }
+        long inicio = System.nanoTime();
+        JsonNode respuesta;
+        try {
+            respuesta = restClient.post().uri("/api/chat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(cuerpo)
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (RestClientResponseException e) {
+            log.warn("Ollama respondió HTTP {} (modelo={})", e.getStatusCode().value(), config.modelo());
+            throw new LlmNoDisponibleException(MSG_NO_DISPONIBLE);
+        } catch (ResourceAccessException e) {
+            if (esTimeout(e)) {
+                log.warn("Timeout esperando a Ollama (modelo={}, imagenes={})", config.modelo(), cantImagenes);
+                throw new LlmTimeoutException(MSG_TIMEOUT);
+            }
+            log.warn("No se pudo conectar con Ollama (modelo={})", config.modelo());
+            throw new LlmNoDisponibleException(MSG_NO_DISPONIBLE);
+        }
+        long ms = (System.nanoTime() - inicio) / 1_000_000;
+        JsonNode contenido = respuesta == null ? null : respuesta.path("message").path("content");
+        if (contenido == null || !contenido.isTextual()) {
+            log.warn("Respuesta de Ollama sin message.content (modelo={})", config.modelo());
+            throw new LlmNoDisponibleException(MSG_NO_DISPONIBLE);
+        }
+        log.info("Ollama completó: modelo={}, imagenes={}, duracionMs={}, eval_count={}",
+            config.modelo(), cantImagenes, ms, respuesta.path("eval_count").asText("n/d"));
+        if (logPrompts) {
+            log.debug("ADVERTENCIA: extractor.debug.log-prompts activo. Respuesta: {}", contenido.asText());
+        }
+        return contenido.asText();
+    }
+
+    private ObjectNode armarCuerpo(PromptLlm prompt) {
+        ObjectNode cuerpo = mapper.createObjectNode();
+        cuerpo.put("model", config.modelo());
+        cuerpo.put("stream", false);
+        cuerpo.set("format", prompt.esquema());
+        cuerpo.putObject("options").put("temperature", 0).put("num_ctx", config.numCtx());
+        if (config.think() != null) {
+            cuerpo.put("think", config.think().booleanValue());
+        }
+        ArrayNode mensajes = cuerpo.putArray("messages");
+        mensajes.addObject().put("role", "system").put("content", prompt.sistema());
+        ObjectNode usuario = mensajes.addObject();
+        usuario.put("role", "user").put("content", prompt.usuario());
+        if (prompt.imagenesBase64() != null && !prompt.imagenesBase64().isEmpty()) {
+            ArrayNode imgs = usuario.putArray("images");
+            prompt.imagenesBase64().forEach(imgs::add);
+        }
+        return cuerpo;
+    }
+
+    private static boolean esTimeout(Throwable t) {
+        for (Throwable c = t; c != null; c = c.getCause()) {
+            if (c instanceof HttpTimeoutException || c instanceof SocketTimeoutException) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
