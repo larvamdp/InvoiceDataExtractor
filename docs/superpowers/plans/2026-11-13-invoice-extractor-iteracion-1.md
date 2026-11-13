@@ -77,7 +77,9 @@ benchmark/resultados/         # en .gitignore
 ### Task 1: Proyecto base, configuración y DTOs de la API
 
 **Files:**
-- Create: `pom.xml`, `scripts/mvn.sh`, `.gitignore`, `src/main/resources/application.yml`, `ExtractorApplication.java`, `config/ExtractorProperties.java`, todos los `api/dto/*.java`
+- Create: `pom.xml`, `scripts/mvn.sh`, 
+- Modify: `.gitignore` (ya existe, plantilla Java de GitHub: agregar líneas)
+- Create: `src/main/resources/application.yml`, `ExtractorApplication.java`, `config/ExtractorProperties.java`, todos los `api/dto/*.java`
 - Test: `src/test/java/ar/comprobantes/extractor/api/dto/SerializacionDtoTest.java`, `config/ExtractorPropertiesTest.java`
 
 **Interfaces:**
@@ -96,7 +98,7 @@ benchmark/resultados/         # en .gitignore
     - `debug.logPrompts=false`
   - `application.yml`: `spring.servlet.multipart.max-file-size=10MB`, `max-request-size=11MB`; logging nivel INFO.
 
-- [ ] **Step 1: `scripts/mvn.sh`** — `docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -v "$HOME/.m2":/var/maven/.m2 -e MAVEN_CONFIG=/var/maven/.m2 -w /app maven:3.9-eclipse-temurin-21 mvn -Duser.home=/var/maven "$@"`; `chmod +x`. `.gitignore`: `target/`, `benchmark/reales/`, `benchmark/resultados/`.
+- [ ] **Step 1: `scripts/mvn.sh`** — `docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -v "$HOME/.m2":/var/maven/.m2 -e MAVEN_CONFIG=/var/maven/.m2 -w /app maven:3.9-eclipse-temurin-21 mvn -Duser.home=/var/maven "$@"`; `chmod +x`. Agregar a `.gitignore`: `target/`, `benchmark/reales/`, `benchmark/resultados/`.
 - [ ] **Step 2: `pom.xml`** con `spring-boot-starter-parent` 3.5.x, Java 21, dependencias: `spring-boot-starter-web`, `spring-boot-starter-validation`, `pdfbox` 3.0.x, `com.google.zxing:core` y `javase` 3.5.x; test: `spring-boot-starter-test`, `org.wiremock:wiremock-standalone` 3.x. Plugin `exec-maven-plugin` (para el benchmark, Task 12).
 - [ ] **Step 3: Write failing tests**
 
