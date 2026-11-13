@@ -10,7 +10,12 @@ import ar.comprobantes.extractor.error.DocumentoInvalidoException;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.zip.CRC32;
 import javax.imageio.ImageIO;
+import org.apache.pdfbox.cos.COSDictionary;
+import org.apache.pdfbox.cos.COSStream;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -98,6 +103,54 @@ class ProcesadorDocumentoTest {
         assertThatThrownBy(() -> procesador.procesar(contenido))
             .isInstanceOf(DocumentoInvalidoException.class)
             .hasMessageContaining("protegido con contraseña");
+    }
+
+    /** Un shading axial sin /Coords hace que PDFBox lance NullPointerException al rasterizar. */
+    @Test
+    void pdfMalformadoQueLanzaExcepcionDeEjecucionEs400() throws IOException {
+        byte[] contenido;
+        try (PDDocument doc = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            PDPage pagina = new PDPage();
+            doc.addPage(pagina);
+            COSDictionary shading = new COSDictionary();
+            shading.setInt(COSName.SHADING_TYPE, 2);
+            shading.setItem(COSName.COLORSPACE, COSName.DEVICERGB);
+            COSDictionary shadings = new COSDictionary();
+            shadings.setItem(COSName.getPDFName("S1"), shading);
+            COSDictionary recursos = new COSDictionary();
+            recursos.setItem(COSName.SHADING, shadings);
+            pagina.getCOSObject().setItem(COSName.RESOURCES, recursos);
+            COSStream flujo = doc.getDocument().createCOSStream();
+            try (java.io.OutputStream o = flujo.createOutputStream()) {
+                o.write("/S1 sh".getBytes());
+            }
+            pagina.getCOSObject().setItem(COSName.CONTENTS, flujo);
+            doc.save(out);
+            contenido = out.toByteArray();
+        }
+        assertThatThrownBy(() -> procesador.procesar(contenido))
+            .isInstanceOf(DocumentoInvalidoException.class)
+            .hasCauseInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void imagenQueDeclaraDimensionesEnormesSeRechazaSinDecodificar() throws IOException {
+        byte[] png = png(10, 10);
+        ByteBuffer.wrap(png).putInt(16, 100_000).putInt(20, 100_000);
+        CRC32 crc = new CRC32();
+        crc.update(png, 12, 17);
+        ByteBuffer.wrap(png).putInt(29, (int) crc.getValue());
+
+        assertThatThrownBy(() -> procesador.procesar(png))
+            .isInstanceOf(DocumentoDemasiadoGrandeException.class);
+    }
+
+    @Test
+    void dpiEfectivoReduceElDpiParaPaginasEnormes() {
+        assertThat(ProcesadorDocumento.dpiEfectivo(new PDRectangle(595, 842), 200)).isEqualTo(200f);
+        float dpi = ProcesadorDocumento.dpiEfectivo(new PDRectangle(14400, 14400), 200);
+        double px = (14400 * dpi / 72.0) * (14400 * dpi / 72.0);
+        assertThat(px).isLessThanOrEqualTo(50_000_000d * 1.01);
     }
 
     @Test

@@ -4,6 +4,7 @@ import ar.comprobantes.extractor.api.dto.ModoProcesamiento;
 import ar.comprobantes.extractor.config.ExtractorProperties;
 import ar.comprobantes.extractor.error.DocumentoDemasiadoGrandeException;
 import ar.comprobantes.extractor.error.DocumentoInvalidoException;
+import ar.comprobantes.extractor.error.ExtraccionException;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
@@ -11,13 +12,17 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.io.IOUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -27,6 +32,9 @@ import org.springframework.stereotype.Component;
 /** Procesa el documento enteramente en memoria (sin archivos temporales). */
 @Component
 public class ProcesadorDocumento {
+
+    /** Tope de píxeles al decodificar una imagen o rasterizar una página (protege la memoria). */
+    private static final long MAX_PIXELES = 50_000_000L;
 
     private final DetectorTipoDocumento detector;
     private final ExtractorProperties.Documento config;
@@ -79,9 +87,10 @@ public class ProcesadorDocumento {
             List<BufferedImage> qr = new ArrayList<>();
             List<BufferedImage> llm = new ArrayList<>();
             for (int i = 0; i < paginas; i++) {
-                qr.add(renderer.renderImageWithDPI(i, config.dpiQr(), ImageType.RGB));
+                PDRectangle caja = pdf.getPage(i).getMediaBox();
+                qr.add(renderer.renderImageWithDPI(i, dpiEfectivo(caja, config.dpiQr()), ImageType.RGB));
                 if (!todasUtilizables) {
-                    llm.add(renderer.renderImageWithDPI(i, config.dpiImagen(), ImageType.RGB));
+                    llm.add(renderer.renderImageWithDPI(i, dpiEfectivo(caja, config.dpiImagen()), ImageType.RGB));
                 }
             }
             tiempos.put("rasterizacion", transcurridoMs(t2));
@@ -93,21 +102,17 @@ public class ProcesadorDocumento {
             throw new DocumentoInvalidoException("El PDF está protegido con contraseña.", e);
         } catch (IOException e) {
             throw new DocumentoInvalidoException("El PDF no pudo leerse.", e);
+        } catch (ExtraccionException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new DocumentoInvalidoException("El PDF no pudo leerse.", e);
         }
     }
 
     private DocumentoProcesado procesarImagen(byte[] contenido, TipoDocumento tipo, Map<String, Long> tiempos) {
         tiempos.put("extraccionTexto", 0L);
         long t0 = System.nanoTime();
-        BufferedImage original;
-        try {
-            original = ImageIO.read(new ByteArrayInputStream(contenido));
-        } catch (IOException e) {
-            throw new DocumentoInvalidoException("La imagen no pudo leerse.", e);
-        }
-        if (original == null) {
-            throw new DocumentoInvalidoException("La imagen no pudo leerse.");
-        }
+        BufferedImage original = decodificar(contenido);
         if (tipo == TipoDocumento.JPEG) {
             original = aplicarOrientacion(original, orientacionExif(contenido));
         }
@@ -115,6 +120,39 @@ public class ProcesadorDocumento {
         tiempos.put("rasterizacion", transcurridoMs(t0));
         return new DocumentoProcesado(tipo, 1, ModoProcesamiento.IMAGEN, null,
             List.of(paraLlm), List.of(original), tiempos);
+    }
+
+    /** Verifica las dimensiones declaradas antes de decodificar, para no agotar la memoria. */
+    private static BufferedImage decodificar(byte[] contenido) {
+        try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(contenido))) {
+            Iterator<ImageReader> lectores = ImageIO.getImageReaders(in);
+            if (!lectores.hasNext()) {
+                throw new DocumentoInvalidoException("La imagen no pudo leerse.");
+            }
+            ImageReader lector = lectores.next();
+            try {
+                lector.setInput(in, true, true);
+                if ((long) lector.getWidth(0) * lector.getHeight(0) > MAX_PIXELES) {
+                    throw new DocumentoDemasiadoGrandeException("Las dimensiones de la imagen exceden el máximo permitido.");
+                }
+                return lector.read(0);
+            } finally {
+                lector.dispose();
+            }
+        } catch (IOException | RuntimeException e) {
+            if (e instanceof ExtraccionException ex) {
+                throw ex;
+            }
+            throw new DocumentoInvalidoException("La imagen no pudo leerse.", e);
+        }
+    }
+
+    static float dpiEfectivo(PDRectangle caja, int dpi) {
+        double px = (caja.getWidth() * dpi / 72.0) * (caja.getHeight() * dpi / 72.0);
+        if (px <= MAX_PIXELES) {
+            return dpi;
+        }
+        return (float) (dpi * Math.sqrt(MAX_PIXELES / px));
     }
 
     static BufferedImage limitarLado(BufferedImage img, int maxLado) {
