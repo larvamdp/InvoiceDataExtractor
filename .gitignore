@@ -26,3 +26,8 @@ replay_pid*
 # Espacios de trabajo locales de Claude Code / superpowers
 .claude/worktrees/
 .superpowers/
+
+# Proyecto
+target/
+benchmark/reales/
+benchmark/resultados/
