@@ -4,6 +4,7 @@ import ar.comprobantes.extractor.config.ExtractorProperties;
 import ar.comprobantes.extractor.error.ServicioOcupadoException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Component;
 
@@ -23,12 +24,20 @@ public class LimitadorConcurrencia {
     }
 
     public <T> T ejecutar(Supplier<T> tarea) {
+        return ejecutar(tarea, nanos -> { });
+    }
+
+    /** Igual que {@link #ejecutar(Supplier)}, informando en nanosegundos cuánto se esperó para adquirir el permiso. */
+    public <T> T ejecutar(Supplier<T> tarea, LongConsumer esperaNanosConsumer) {
         boolean adquirido;
+        long desde = System.nanoTime();
         try {
             adquirido = semaforo.tryAcquire(esperaNanos, TimeUnit.NANOSECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ServicioOcupadoException(MENSAJE, e);
+        } finally {
+            esperaNanosConsumer.accept(System.nanoTime() - desde);
         }
         if (!adquirido) {
             throw new ServicioOcupadoException(MENSAJE);

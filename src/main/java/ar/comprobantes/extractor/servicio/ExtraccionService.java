@@ -68,9 +68,8 @@ public class ExtraccionService {
 
         PromptLlm prompt = constructorPrompt.construir(solicitud, doc, qr);
 
-        t = System.nanoTime();
-        RespuestaLlm respuesta = consultarLlm(prompt, solicitud);
-        long msLlm = ms(t);
+        long[] nanosLlm = new long[2]; // [0] tiempo dentro del LLM, [1] espera en cola
+        RespuestaLlm respuesta = consultarLlm(prompt, solicitud, nanosLlm);
 
         DatosQrArca datosQr = qr.presente() ? qr.datos() : null;
         boolean verificarTexto = doc.modo() == ModoProcesamiento.TEXTO;
@@ -95,7 +94,8 @@ public class ExtraccionService {
         tiempos.put("qr", msQr);
         tiempos.put("extraccionTexto", doc.tiemposMs().getOrDefault("extraccionTexto", 0L));
         tiempos.put("rasterizacion", doc.tiemposMs().getOrDefault("rasterizacion", 0L));
-        tiempos.put("llm", msLlm);
+        tiempos.put("llm", nanosLlm[0] / 1_000_000);
+        tiempos.put("esperaCola", nanosLlm[1] / 1_000_000);
         tiempos.put("total", ms(inicio));
 
         Metadatos metadatos = new Metadatos(doc.tipo().name(), doc.paginas(), doc.modo(), verificarTexto,
@@ -107,13 +107,25 @@ public class ExtraccionService {
         return new ResultadoExtraccion(cabecera, detalle, qr, metadatos);
     }
 
-    private RespuestaLlm consultarLlm(PromptLlm prompt, SolicitudExtraccion solicitud) {
+    private RespuestaLlm consultarLlm(PromptLlm prompt, SolicitudExtraccion solicitud, long[] nanos) {
         try {
-            return parser.parsear(limitador.ejecutar(() -> llm.completar(prompt)), solicitud);
+            return parser.parsear(completar(prompt, nanos), solicitud);
         } catch (RespuestaLlmInvalidaException primera) {
             log.warn("Respuesta del modelo inválida; se reintenta una vez.");
-            return parser.parsear(limitador.ejecutar(() -> llm.completar(prompt)), solicitud);
+            return parser.parsear(completar(prompt, nanos), solicitud);
         }
+    }
+
+    /** Acumula en nanos[0] el tiempo dentro de llm.completar y en nanos[1] la espera del limitador. */
+    private String completar(PromptLlm prompt, long[] nanos) {
+        return limitador.ejecutar(() -> {
+            long desde = System.nanoTime();
+            try {
+                return llm.completar(prompt);
+            } finally {
+                nanos[0] += System.nanoTime() - desde;
+            }
+        }, espera -> nanos[1] += espera);
     }
 
     private ValorCampo conciliar(CampoSolicitado campo, ValorLlm valorLlm, DatosQrArca qr, String texto,

@@ -35,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import javax.imageio.ImageIO;
@@ -66,9 +67,15 @@ class ExtraccionServiceTest {
     private final AtomicInteger llamadas = new AtomicInteger();
 
     private ExtraccionService servicio(Function<Integer, String> respuestas) {
-        ExtractorProperties props = new ExtractorProperties(null,
-            new ExtractorProperties.Concurrencia(1, Duration.ofSeconds(5)),
-            new ExtractorProperties.Documento(10, 150, 200, 2000, 50), null);
+        return servicio(respuestas, null);
+    }
+
+    private static final ExtractorProperties PROPS = new ExtractorProperties(null,
+        new ExtractorProperties.Concurrencia(1, Duration.ofSeconds(5)),
+        new ExtractorProperties.Documento(10, 150, 200, 2000, 50), null);
+
+    private ExtraccionService servicio(Function<Integer, String> respuestas, LimitadorConcurrencia limite) {
+        ExtractorProperties props = PROPS;
         ObjectMapper om = new ObjectMapper();
         Normalizador norm = new Normalizador();
         LlmCliente llm = new LlmCliente() {
@@ -86,7 +93,7 @@ class ExtraccionServiceTest {
             new ProcesadorDocumento(new DetectorTipoDocumento(), props),
             new LectorQrArca(new DecodificadorQrArca()),
             new ConstructorPrompt(new EsquemaRespuesta(), om),
-            new ParserRespuestaLlm(om), llm, new LimitadorConcurrencia(props),
+            new ParserRespuestaLlm(om), llm, limite != null ? limite : new LimitadorConcurrencia(props),
             new ConciliadorQr(norm), new VerificadorTextual(norm));
     }
 
@@ -110,7 +117,39 @@ class ExtraccionServiceTest {
         assertThat(r.metadatos().verificacionTextual()).isTrue();
         assertThat(r.metadatos().modelo()).isEqualTo("modelo-falso");
         assertThat(r.metadatos().tiemposMs().keySet()).containsExactly(
-            "deteccion", "qr", "extraccionTexto", "rasterizacion", "llm", "total");
+            "deteccion", "qr", "extraccionTexto", "rasterizacion", "llm", "esperaCola", "total");
+        assertThat(r.metadatos().tiemposMs().get("total")).isGreaterThanOrEqualTo(r.metadatos().tiemposMs().get("llm"));
+    }
+
+    @Test
+    void tiempoLlmExcluyeEsperaEnCola() throws Exception {
+        LimitadorConcurrencia limite = new LimitadorConcurrencia(PROPS);
+        CountDownLatch dentro = new CountDownLatch(1);
+        Thread ocupante = new Thread(() -> limite.ejecutar(() -> {
+            dentro.countDown();
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return "x";
+        }));
+        ocupante.start();
+        dentro.await();
+        byte[] pdf = pdf(true);
+        ResultadoExtraccion r = servicio(n -> {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return JSON_OK;
+        }, limite).extraer(pdf, solicitud());
+        ocupante.join();
+        var t = r.metadatos().tiemposMs();
+        assertThat(t.get("esperaCola")).isGreaterThanOrEqualTo(100L);
+        assertThat(t.get("llm")).isBetween(40L, 150L);
+        assertThat(t.get("total")).isGreaterThanOrEqualTo(t.get("esperaCola") + t.get("llm"));
     }
 
     @Test
