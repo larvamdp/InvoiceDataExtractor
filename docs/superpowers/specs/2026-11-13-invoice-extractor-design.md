@@ -133,7 +133,7 @@ Internamente, un **semáforo/pool acotado** limita las llamadas concurrentes al 
   ],
   "qrArca": {
     "presente": true,
-    "datos": { "ver": 1, "fecha": "2026-10-02", "cuit": 30712345678, "ptoVta": 3, "tipoCmp": 1, "nroCmp": 12345, "importe": 15000.0, "moneda": "PES", "ctz": 1, "tipoDocRec": 80, "nroDocRec": 20123456789, "tipoCodAut": "E", "codAut": 76543210987654 },
+    "datos": { "ver": 1, "fecha": "2026-10-02", "cuit": 30712345671, "ptoVta": 3, "tipoCmp": 1, "nroCmp": 12345, "importe": 15000.0, "moneda": "PES", "ctz": 1, "tipoDocRec": 80, "nroDocRec": 20123456789, "tipoCodAut": "E", "codAut": 76543210987654 },
     "descripcion": null
   },
   "metadatos": {
