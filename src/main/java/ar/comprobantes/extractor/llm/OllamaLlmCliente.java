@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import org.slf4j.Logger;
@@ -17,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -24,6 +26,7 @@ import org.springframework.web.client.RestClientResponseException;
 public class OllamaLlmCliente implements LlmCliente {
 
     private static final Logger log = LoggerFactory.getLogger(OllamaLlmCliente.class);
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
     private static final String MSG_NO_DISPONIBLE = "El servicio de IA no está disponible.";
     private static final String MSG_TIMEOUT = "El modelo excedió el tiempo máximo de respuesta.";
 
@@ -33,9 +36,15 @@ public class OllamaLlmCliente implements LlmCliente {
     private final RestClient restClient;
 
     public OllamaLlmCliente(ExtractorProperties props) {
+        this(props, CONNECT_TIMEOUT);
+    }
+
+    OllamaLlmCliente(ExtractorProperties props, Duration connectTimeout) {
         this.config = props.ollama();
         this.logPrompts = props.debug().logPrompts();
-        HttpClient httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(10)).build();
+        // HTTP/1.1 forzado: el upgrade h2c por defecto del cliente JDK falla contra servidores HTTP/1.1 (WireMock/Jetty).
+        HttpClient httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(connectTimeout).build();
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
         factory.setReadTimeout(config.timeout());
         this.restClient = RestClient.builder().baseUrl(config.url()).requestFactory(factory).build();
@@ -71,6 +80,10 @@ public class OllamaLlmCliente implements LlmCliente {
                 throw new LlmTimeoutException(MSG_TIMEOUT);
             }
             log.warn("No se pudo conectar con Ollama (modelo={})", config.modelo());
+            throw new LlmNoDisponibleException(MSG_NO_DISPONIBLE);
+        } catch (RestClientException e) {
+            // Cuerpo no JSON / content-type inesperado: el mensaje podría contener la respuesta, no se loguea.
+            log.warn("Respuesta de Ollama ilegible (modelo={}, tipo={})", config.modelo(), e.getClass().getSimpleName());
             throw new LlmNoDisponibleException(MSG_NO_DISPONIBLE);
         }
         long ms = (System.nanoTime() - inicio) / 1_000_000;
@@ -109,6 +122,9 @@ public class OllamaLlmCliente implements LlmCliente {
 
     private static boolean esTimeout(Throwable t) {
         for (Throwable c = t; c != null; c = c.getCause()) {
+            if (c instanceof HttpConnectTimeoutException) {
+                return false; // timeout de conexión: host inalcanzable, no es timeout de lectura
+            }
             if (c instanceof HttpTimeoutException || c instanceof SocketTimeoutException) {
                 return true;
             }

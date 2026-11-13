@@ -122,4 +122,25 @@ class OllamaLlmClienteTest {
         var c = cliente(servidor.baseUrl(), Duration.ofSeconds(5), null);
         assertThatThrownBy(() -> c.completar(prompt(List.of()))).isInstanceOf(LlmNoDisponibleException.class);
     }
+
+    @Test
+    void cuerpoNoJsonEs503() {
+        servidor.stubFor(post("/api/chat").willReturn(aResponse().withStatus(200)
+            .withHeader("Content-Type", "text/plain").withBody("no es json")));
+        var c = cliente(servidor.baseUrl(), Duration.ofSeconds(5), null);
+        assertThatThrownBy(() -> c.completar(prompt(List.of())))
+            .isInstanceOf(LlmNoDisponibleException.class)
+            .hasMessageNotContaining("no es json");
+    }
+
+    @Test
+    void timeoutDeConexionEs503() {
+        var props = new ExtractorProperties(
+            new ExtractorProperties.Ollama("http://10.255.255.1:11434", "qwen3-vl:4b", Duration.ofSeconds(5), 8192, null),
+            new ExtractorProperties.Concurrencia(1, Duration.ofSeconds(60)),
+            new ExtractorProperties.Documento(10, 150, 200, 2000, 50),
+            new ExtractorProperties.Debug(false));
+        var c = new OllamaLlmCliente(props, Duration.ofMillis(300));
+        assertThatThrownBy(() -> c.completar(prompt(List.of()))).isInstanceOf(LlmNoDisponibleException.class);
+    }
 }
