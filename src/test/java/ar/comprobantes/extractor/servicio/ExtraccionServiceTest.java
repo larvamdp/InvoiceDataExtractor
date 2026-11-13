@@ -123,12 +123,22 @@ class ExtraccionServiceTest {
 
     @Test
     void tiempoLlmExcluyeEsperaEnCola() throws Exception {
-        LimitadorConcurrencia limite = new LimitadorConcurrencia(PROPS);
+        CountDownLatch intentando = new CountDownLatch(1);
         CountDownLatch dentro = new CountDownLatch(1);
+        LimitadorConcurrencia limite = new LimitadorConcurrencia(PROPS) {
+            @Override
+            public <T> T ejecutar(java.util.function.Supplier<T> tarea, java.util.function.LongConsumer espera) {
+                if (dentro.getCount() == 0) { // la llamada del ocupante no cuenta
+                    intentando.countDown();
+                }
+                return super.ejecutar(tarea, espera);
+            }
+        };
+        CountDownLatch soltar = new CountDownLatch(1);
         Thread ocupante = new Thread(() -> limite.ejecutar(() -> {
             dentro.countDown();
             try {
-                Thread.sleep(200);
+                soltar.await();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -136,6 +146,17 @@ class ExtraccionServiceTest {
         }));
         ocupante.start();
         dentro.await();
+        // El permiso se libera 300 ms después de que el servicio empieza a esperar en el limitador.
+        Thread liberador = new Thread(() -> {
+            try {
+                intentando.await();
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            soltar.countDown();
+        });
+        liberador.start();
         byte[] pdf = pdf(true);
         ResultadoExtraccion r = servicio(n -> {
             try {
@@ -146,9 +167,10 @@ class ExtraccionServiceTest {
             return JSON_OK;
         }, limite).extraer(pdf, solicitud());
         ocupante.join();
+        liberador.join();
         var t = r.metadatos().tiemposMs();
-        assertThat(t.get("esperaCola")).isGreaterThanOrEqualTo(100L);
-        assertThat(t.get("llm")).isBetween(40L, 150L);
+        assertThat(t.get("esperaCola")).isGreaterThanOrEqualTo(250L);
+        assertThat(t.get("llm")).isLessThan(t.get("esperaCola"));
         assertThat(t.get("total")).isGreaterThanOrEqualTo(t.get("esperaCola") + t.get("llm"));
     }
 
