@@ -32,39 +32,39 @@ public class ConciliadorQr {
 
     public ValorCampo conciliar(CampoSolicitado campo, ValorLlm llm, DatosQrArca qr) {
         ResultadoNormalizacion doc = normalizador.normalizar(llm.valor(), campo.tipo());
-        List<String> claves = clavesDisponibles(llm.clavesQr(), qr);
+        List<String> claves = qr == null || llm.clavesQr() == null ? List.<String>of() : llm.clavesQr();
+        boolean todasPresentes = claves.stream().allMatch(c -> qr.valorDeClave(c) != null);
 
-        if (claves.size() == 1 && !DatosQrArca.CLAVES_CODIGO.contains(claves.get(0))) {
+        if (claves.size() == 1 && todasPresentes && !DatosQrArca.CLAVES_CODIGO.contains(claves.get(0))) {
             Object valorQr = qr.valorDeClave(claves.get(0));
             Object normalizadoQr = normalizarQr(valorQr, campo.tipo());
-            String descripcion = llm.descripcion();
-            if (doc.valor() != null && !iguales(doc.valor(), normalizadoQr)) {
-                descripcion = unir(descripcion, "En el documento figura " + llm.valor() + "; el QR indica "
-                    + texto(valorQr) + "; se usó el QR.");
+            if (normalizadoQr != null) {
+                String descripcion = llm.descripcion();
+                if (doc.valor() != null && !iguales(doc.valor(), normalizadoQr)) {
+                    descripcion = unir(descripcion, "En el documento figura " + llm.valor() + "; el QR indica "
+                        + texto(valorQr) + "; se usó el QR.");
+                }
+                return new ValorCampo(normalizadoQr, descripcion, Fuente.QR_ARCA);
             }
-            return new ValorCampo(normalizadoQr, descripcion, Fuente.QR_ARCA);
         }
 
         String descripcion = unir(llm.descripcion(), doc.observacion());
-        if (doc.valor() != null && !claves.isEmpty()) {
+        if (doc.valor() != null && !claves.isEmpty() && todasPresentes) {
             descripcion = unir(descripcion, verificar(doc.valor(), claves, qr));
         }
         return new ValorCampo(doc.valor(), descripcion, doc.valor() == null ? null : Fuente.DOCUMENTO);
     }
 
-    private static List<String> clavesDisponibles(List<String> clavesQr, DatosQrArca qr) {
-        if (qr == null || clavesQr == null) {
-            return List.of();
-        }
-        return clavesQr.stream().filter(c -> qr.valorDeClave(c) != null).toList();
-    }
-
     private static Object normalizarQr(Object valor, TipoCampo tipo) {
-        return switch (tipo) {
-            case TEXTO, FECHA -> valor.toString();
-            case CUIT -> valor.toString().replaceAll("\\D", "");
-            case IMPORTE, NUMERO -> valor instanceof BigDecimal b ? b : new BigDecimal(valor.toString());
-        };
+        try {
+            return switch (tipo) {
+                case TEXTO, FECHA -> valor.toString();
+                case CUIT -> valor.toString().replaceAll("\\D", "");
+                case IMPORTE, NUMERO -> valor instanceof BigDecimal b ? b : new BigDecimal(valor.toString());
+            };
+        } catch (NumberFormatException e) {
+            return null; // la clave elegida por el LLM no es numérica: no se aplica el QR
+        }
     }
 
     private static String texto(Object valor) {

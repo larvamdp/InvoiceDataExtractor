@@ -90,4 +90,30 @@ class ConciliadorQrTest {
             new ValorLlm("30-71234567-2", "CUIT.", List.of()), null);
         assertThat(r.descripcion()).startsWith("CUIT. ").contains("dígito verificador");
     }
+
+    @Test void claveNoNumericaParaImporteUsaDocumento() {
+        ValorCampo r = conciliador.conciliar(campo("importeTotal", TipoCampo.IMPORTE),
+            new ValorLlm("15.000,00", "Total.", List.of("fecha")), qr);
+        assertThat((BigDecimal) r.valor()).isEqualByComparingTo("15000.00");
+        assertThat(r.fuente()).isEqualTo(Fuente.DOCUMENTO);
+    }
+
+    @Test void mapeoParcialConClaveNulaEnQrNoSobrescribe() {
+        DatosQrArca sinNro = new DatosQrArca(1, "2026-10-02", 30712345671L, 3, 1, null,
+            new BigDecimal("15000"), "PES", BigDecimal.ONE, 80, 20123456786L, "E", 70417054367476L);
+        ValorCampo r = conciliador.conciliar(campo("numeroFactura", TipoCampo.TEXTO),
+            new ValorLlm("A 0003-00012345", "Número.", List.of("ptoVta", "nroCmp")), sinNro);
+        assertThat(r.valor()).isEqualTo("A 0003-00012345");
+        assertThat(r.fuente()).isEqualTo(Fuente.DOCUMENTO);
+        assertThat(r.descripcion()).doesNotContain("Verificado").doesNotContain("No coincide");
+    }
+
+    @Test void unaClaveConValorNuloEnQrUsaDocumento() {
+        DatosQrArca sinNro = new DatosQrArca(1, "2026-10-02", 30712345671L, 3, 1, null,
+            new BigDecimal("15000"), "PES", BigDecimal.ONE, 80, 20123456786L, "E", 70417054367476L);
+        ValorCampo r = conciliador.conciliar(campo("n", TipoCampo.NUMERO),
+            new ValorLlm("12345", "N.", List.of("nroCmp")), sinNro);
+        assertThat((BigDecimal) r.valor()).isEqualByComparingTo("12345");
+        assertThat(r.fuente()).isEqualTo(Fuente.DOCUMENTO);
+    }
 }
