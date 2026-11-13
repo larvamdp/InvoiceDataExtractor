@@ -99,7 +99,7 @@ Internamente, un **semáforo/pool acotado** limita las llamadas concurrentes al 
     { "nombre": "importeTotal", "etiquetas": ["Total", "Importe total"], "tipo": "IMPORTE" }
   ],
   "camposDetalle": [
-    { "nombre": "descripcion", "etiquetas": ["Descripción", "Detalle", "Concepto"], "tipo": "TEXTO" },
+    { "nombre": "concepto", "etiquetas": ["Concepto", "Descripción", "Detalle"], "tipo": "TEXTO" },
     { "nombre": "cantidad", "etiquetas": ["Cant.", "Cantidad"], "tipo": "NUMERO" },
     { "nombre": "precioUnitario", "etiquetas": ["P. Unit.", "Precio unitario"], "tipo": "IMPORTE" }
   ]
@@ -126,7 +126,7 @@ Internamente, un **semáforo/pool acotado** limita las llamadas concurrentes al 
   },
   "detalle": [
     {
-      "descripcion":    { "valor": "Energía activa", "descripcion": null, "fuente": "DOCUMENTO" },
+      "concepto":       { "valor": "Energía activa", "descripcion": null, "fuente": "DOCUMENTO" },
       "cantidad":       { "valor": 350, "descripcion": null, "fuente": "DOCUMENTO" },
       "precioUnitario": { "valor": 123.45, "descripcion": null, "fuente": "DOCUMENTO" }
     }
