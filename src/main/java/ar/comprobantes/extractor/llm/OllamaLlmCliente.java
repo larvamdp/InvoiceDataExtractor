@@ -14,6 +14,7 @@ import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -35,6 +36,7 @@ public class OllamaLlmCliente implements LlmCliente {
     private final ObjectMapper mapper = new ObjectMapper();
     private final RestClient restClient;
 
+    @Autowired
     public OllamaLlmCliente(ExtractorProperties props) {
         this(props, CONNECT_TIMEOUT);
     }

@@ -1,0 +1,17 @@
+{
+  "camposCabecera": [
+    {
+      "nombre": "numeroComprobante",
+      "etiquetas": ["Número factura", "Número de factura", "Nro. factura", "Factura N°", "Comp. Nro"],
+      "descripcion": "Número completo del comprobante, incluyendo punto de venta",
+      "tipo": "TEXTO"
+    },
+    { "nombre": "fechaEmision", "etiquetas": ["Fecha", "Fecha de emisión"], "tipo": "FECHA" },
+    { "nombre": "importeTotal", "etiquetas": ["Total", "Importe total"], "tipo": "IMPORTE" }
+  ],
+  "camposDetalle": [
+    { "nombre": "concepto", "etiquetas": ["Concepto", "Descripción", "Detalle"], "tipo": "TEXTO" },
+    { "nombre": "cantidad", "etiquetas": ["Cant.", "Cantidad"], "tipo": "NUMERO" },
+    { "nombre": "precioUnitario", "etiquetas": ["P. Unit.", "Precio unitario"], "tipo": "IMPORTE" }
+  ]
+}
