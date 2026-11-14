@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 /** Mide tiempos y precisión del servicio contra el dataset. Se ejecuta con exec:java (ver README). */
@@ -50,7 +51,7 @@ public final class BenchmarkRunner {
     public static void main(String[] args) throws Exception {
         Map<String, String> opc = new java.util.HashMap<>(Map.of("--url", "http://localhost:8080",
                 "--dataset", "benchmark/dataset", "--concurrencia", "1", "--salida", "benchmark/resultados",
-                "--filtro", ""));
+                "--filtro", "", "--modelo", ""));
         for (int i = 0; i + 1 < args.length; i += 2) {
             opc.put(args[i], args[i + 1]);
         }
@@ -67,18 +68,24 @@ public final class BenchmarkRunner {
                     .sorted().toList();
         }
         HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        if (!opc.get("--modelo").isBlank()) {
+            modeloRespuesta.set(opc.get("--modelo"));
+        }
         ExecutorService pool = Executors.newFixedThreadPool(concurrencia);
-        List<Future<Fila>> futuros = new ArrayList<>();
-        for (Path d : docs) {
-            futuros.add(pool.submit(() -> procesar(http, url, d)));
-        }
         List<Fila> filas = new ArrayList<>();
-        for (Future<Fila> f : futuros) {
-            filas.add(f.get());
+        try {
+            List<Future<Fila>> futuros = new ArrayList<>();
+            for (Path d : docs) {
+                futuros.add(pool.submit(() -> procesarSeguro(http, url, d)));
+            }
+            for (Future<Fila> f : futuros) {
+                filas.add(f.get());
+            }
+        } finally {
+            pool.shutdown();
         }
-        pool.shutdown();
 
-        String modelo = ultimoModelo;
+        String modelo = modeloRespuesta.get() != null ? modeloRespuesta.get() : "sin-respuestas-200";
         Files.createDirectories(salida);
         String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
         Path csv = salida.resolve(ts + "-" + modelo.replace(':', '_').replace('/', '_') + ".csv");
@@ -91,7 +98,18 @@ public final class BenchmarkRunner {
         System.out.println("CSV: " + csv);
     }
 
-    private static volatile String ultimoModelo = "desconocido";
+    /** Modelo indicado con --modelo o, si no, el de la primera respuesta 200. */
+    private static final AtomicReference<String> modeloRespuesta = new AtomicReference<>();
+
+    private static Fila procesarSeguro(HttpClient http, String url, Path dir) {
+        try {
+            return procesar(http, url, dir);
+        } catch (IOException e) {
+            String id = dir.getFileName().toString();
+            System.out.println("<- " + id + " ERROR al leer el dataset: " + e.getClass().getSimpleName());
+            return new Fila(id, id.substring(id.lastIndexOf('-') + 1), "-", "-", -1, 0, 0, 0, 0, 0, 0, 0, false);
+        }
+    }
 
     @SuppressWarnings("unchecked")
     private static Fila procesar(HttpClient http, String url, Path dir) throws IOException {
@@ -118,16 +136,16 @@ public final class BenchmarkRunner {
         try {
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
             long medido = (System.nanoTime() - t0) / 1_000_000;
-            JsonNode json = OM.readTree(resp.body());
             if (resp.statusCode() != 200) {
                 Fila f = new Fila(id, forma, "-", "-", resp.statusCode(), medido, 0, 0, 0, 0, 0, 0, false);
                 System.out.println("<- " + id + " status " + resp.statusCode());
                 return f;
             }
+            JsonNode json = OM.readTree(resp.body());
             JsonNode meta = json.path("metadatos");
             JsonNode t = meta.path("tiemposMs");
             if (!meta.path("modelo").isMissingNode()) {
-                ultimoModelo = meta.path("modelo").asText();
+                modeloRespuesta.compareAndSet(null, meta.path("modelo").asText());
             }
             long total = t.path("total").asLong(medido);
             var r = Comparador.comparar(esperado, json);
@@ -160,16 +178,24 @@ public final class BenchmarkRunner {
             porModo.computeIfAbsent(f.status() == 200 ? f.modo() : "ERROR", k -> new ArrayList<>()).add(f);
         }
         for (var e : porModo.entrySet()) {
-            List<Fila> l = e.getValue();
-            List<Long> tiempos = l.stream().map(Fila::totalMs).sorted(Comparator.naturalOrder()).toList();
-            int ac = l.stream().mapToInt(Fila::aciertos).sum();
-            int tot = l.stream().mapToInt(Fila::camposTotales).sum();
-            int inv = l.stream().mapToInt(Fila::inventados).sum();
-            long ok60 = l.stream().filter(Fila::cumple60s).count();
-            System.out.printf(Locale.ROOT, "Modo %s: n=%d p50=%d ms p95=%d ms aciertos=%.1f%% inventados=%d <=60s=%.0f%%%n",
-                    e.getKey(), l.size(), percentil(tiempos, 50), percentil(tiempos, 95),
-                    tot == 0 ? 0.0 : 100.0 * ac / tot, inv, 100.0 * ok60 / l.size());
+            System.out.println(lineaResumen(e.getKey(), e.getValue()));
         }
+    }
+
+    /** Línea de resumen de un grupo; el grupo "ERROR" no tiene métricas medidas. */
+    static String lineaResumen(String clave, List<Fila> l) {
+        List<Long> tiempos = l.stream().map(Fila::totalMs).sorted(Comparator.naturalOrder()).toList();
+        String base = String.format(Locale.ROOT, "Modo %s: n=%d p50=%d ms p95=%d ms", clave, l.size(),
+                percentil(tiempos, 50), percentil(tiempos, 95));
+        int tot = l.stream().mapToInt(Fila::camposTotales).sum();
+        if ("ERROR".equals(clave) || tot == 0) {
+            return base + " aciertos=n/d inventados=n/d <=60s=n/d";
+        }
+        int ac = l.stream().mapToInt(Fila::aciertos).sum();
+        int inv = l.stream().mapToInt(Fila::inventados).sum();
+        long ok60 = l.stream().filter(Fila::cumple60s).count();
+        return base + String.format(Locale.ROOT, " aciertos=%.1f%% inventados=%d <=60s=%.0f%%",
+                100.0 * ac / tot, inv, 100.0 * ok60 / l.size());
     }
 
     private static long percentil(List<Long> ordenados, int p) {
