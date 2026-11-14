@@ -6,6 +6,7 @@ Servicio REST (Spring Boot 3.5 / Java 21) que extrae campos de facturas argentin
 
 - Docker con Compose v2 (`docker compose`).
 - Para GPU: NVIDIA Container Toolkit. Sin GPU funciona en CPU, más lento.
+- Sin GPU (solo CPU) el modelo es muy lento: un PDF de texto de 1 página tardó ~7 minutos en una notebook. Con el timeout por defecto (`90s`) la API responde 504; subí `EXTRACTOR_OLLAMA_TIMEOUT` (p. ej. `600s`, en un archivo `.env` junto al compose o como variable de entorno).
 - Espacio en disco: el modelo por defecto (`qwen3-vl:4b`, licencia Apache 2.0) ocupa ~3.3 GB.
 
 ## Puesta en marcha
