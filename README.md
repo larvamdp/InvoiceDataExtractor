@@ -83,3 +83,41 @@ El tamaño máximo de archivo es 10 MB (`spring.servlet.multipart.max-file-size`
 - Ollama corre en una red Docker interna sin salida a internet; la API no llama a servicios externos.
 - Nada del documento, del prompt ni de la respuesta del LLM se escribe en logs ni en disco (PDFBox trabaja en memoria).
 - `extractor.debug.log-prompts` (`EXTRACTOR_DEBUG_LOGPROMPTS`) es `false` por defecto. Activarlo registra prompts y respuestas, que contienen datos de las facturas: usarlo solo en diagnóstico, en un entorno controlado, y desactivarlo después.
+
+## Cómo medir
+
+El benchmark (`BenchmarkRunner`) envía cada documento de `benchmark/dataset/` al servicio en marcha, compara contra `esperado.json` y escribe un CSV en `benchmark/resultados/` (no versionado) con un resumen por modo (p50/p95 de `totalMs`, % de aciertos, inventados, % de documentos <= 60 s).
+
+Dataset completo (12 documentos):
+
+```bash
+./scripts/mvn.sh -q test-compile exec:java -Dexec.classpathScope=test \
+  -Dexec.mainClass=ar.comprobantes.extractor.benchmark.BenchmarkRunner \
+  -Dexec.args="--url http://host.docker.internal:8080"
+```
+
+En Linux, `host.docker.internal` no resuelve dentro del contenedor de Maven: usar red del host con `MVN_DOCKER_ARGS="--network host"` y `--url http://localhost:8080`.
+
+Solo algunos documentos (carpetas cuyo nombre contiene el texto):
+
+```bash
+MVN_DOCKER_ARGS="--network host" ./scripts/mvn.sh -q test-compile exec:java -Dexec.classpathScope=test \
+  -Dexec.mainClass=ar.comprobantes.extractor.benchmark.BenchmarkRunner \
+  -Dexec.args="--url http://localhost:8080 --filtro retail-a"
+```
+
+Concurrencia: agregar `--concurrencia 2` a `-Dexec.args` y levantar el servicio con `EXTRACTOR_CONCURRENCIA_MAXLLM=2` (si no, las solicitudes esperan en cola). Otras opciones: `--dataset`, `--salida`.
+
+Comparar modelos: reiniciar el servicio con otro `EXTRACTOR_OLLAMA_MODELO` (el modelo debe estar descargado en Ollama), volver a correr el benchmark y comparar los CSV. Con CPU y modelos grandes subir `EXTRACTOR_OLLAMA_TIMEOUT` (el benchmark espera hasta 15 min por documento).
+
+### Resultados iniciales
+
+Entorno: notebook solo CPU (Intel Comet Lake-U, 8 hilos, sin GPU), modelo `qwen3-vl:4b`, `EXTRACTOR_OLLAMA_TIMEOUT=600s`, concurrencia 1. **Dataset parcial: solo `retail-a` (3 documentos).**
+
+| Documento | Modo | Status | totalMs | Aciertos | Inventados |
+|---|---|---|---|---|---|
+| retail-a-texto | - | 504 | 600576 | n/d | n/d |
+| retail-a-escaneo | - | 504 | 600739 | n/d | n/d |
+| retail-a-foto | - | 504 | 600934 | n/d | n/d |
+
+Los tres documentos agotaron el timeout del LLM (600 s) y devolvieron 504, por lo que no hay métricas de precisión. Conclusión provisional: en esta notebook sin GPU, `qwen3-vl:4b` no cumple el objetivo de 60 s ni termina en 10 min con estos comprobantes (varias líneas de detalle). Falta medir el resto del dataset y concurrencia 2.
