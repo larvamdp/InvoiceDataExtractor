@@ -1,0 +1,22 @@
+{
+  "cabecera" : {
+    "numeroComprobante" : "0003-00000678",
+    "cuitEmisor" : "30712345000",
+    "fechaEmision" : "2025-03-28",
+    "importeTotal" : 18150.00,
+    "numeroOrdenCompra" : null
+  },
+  "detalle" : [ {
+    "concepto" : "Devolución resma papel A4 75g",
+    "cantidad" : 2,
+    "importe" : 9700.00
+  }, {
+    "concepto" : "Bonificación por pronto pago",
+    "cantidad" : 1,
+    "importe" : 3500.00
+  }, {
+    "concepto" : "Diferencia de precio carpetas",
+    "cantidad" : 12,
+    "importe" : 1800.00
+  } ]
+}

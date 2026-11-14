@@ -1,0 +1,42 @@
+{
+  "cabecera" : {
+    "numeroComprobante" : "0003-00012345",
+    "cuitEmisor" : "30712345000",
+    "fechaEmision" : "2025-03-15",
+    "importeTotal" : 317233.57,
+    "numeroOrdenCompra" : null
+  },
+  "detalle" : [ {
+    "concepto" : "Resma papel A4 75g",
+    "cantidad" : 10,
+    "importe" : 48500.00
+  }, {
+    "concepto" : "Lapicera azul caja x50",
+    "cantidad" : 3,
+    "importe" : 21601.50
+  }, {
+    "concepto" : "Carpeta oficio 3 anillos",
+    "cantidad" : 12,
+    "importe" : 25200.00
+  }, {
+    "concepto" : "Cuaderno tapa dura 100 hojas",
+    "cantidad" : 20,
+    "importe" : 37815.00
+  }, {
+    "concepto" : "Marcador permanente negro",
+    "cantidad" : 24,
+    "importe" : 15360.00
+  }, {
+    "concepto" : "Cinta adhesiva 48 mm",
+    "cantidad" : 15,
+    "importe" : 14700.00
+  }, {
+    "concepto" : "Abrochadora metálica",
+    "cantidad" : 4,
+    "importe" : 21200.00
+  }, {
+    "concepto" : "Toner genérico negro",
+    "cantidad" : 2,
+    "importe" : 77800.00
+  } ]
+}

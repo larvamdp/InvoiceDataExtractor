@@ -1,0 +1,18 @@
+{
+  "cabecera" : {
+    "numeroComprobante" : "0002-00009031",
+    "cuitEmisor" : "30556677006",
+    "fechaEmision" : "2025-05-09",
+    "importeTotal" : 12530.00,
+    "numeroOrdenCompra" : null
+  },
+  "detalle" : [ {
+    "concepto" : "Intereses por mora",
+    "cantidad" : 1,
+    "importe" : 8450.00
+  }, {
+    "concepto" : "Gastos administrativos",
+    "cantidad" : 1,
+    "importe" : 3900.00
+  } ]
+}

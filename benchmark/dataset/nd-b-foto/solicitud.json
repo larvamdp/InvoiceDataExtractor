@@ -1,0 +1,44 @@
+{
+  "camposCabecera" : [ {
+    "nombre" : "numeroComprobante",
+    "etiquetas" : [ "ND Nro." ],
+    "descripcion" : "Número del comprobante.",
+    "tipo" : "TEXTO"
+  }, {
+    "nombre" : "cuitEmisor",
+    "etiquetas" : [ "CUIT" ],
+    "descripcion" : "CUIT de quien emite el comprobante.",
+    "tipo" : "CUIT"
+  }, {
+    "nombre" : "fechaEmision",
+    "etiquetas" : [ "Fecha:" ],
+    "descripcion" : "Fecha de emisión.",
+    "tipo" : "FECHA"
+  }, {
+    "nombre" : "importeTotal",
+    "etiquetas" : [ "Total Débito" ],
+    "descripcion" : "Importe total del comprobante.",
+    "tipo" : "IMPORTE"
+  }, {
+    "nombre" : "numeroOrdenCompra",
+    "etiquetas" : [ "Orden de compra" ],
+    "descripcion" : "Número de orden de compra del cliente.",
+    "tipo" : "TEXTO"
+  } ],
+  "camposDetalle" : [ {
+    "nombre" : "concepto",
+    "etiquetas" : [ "Concepto" ],
+    "descripcion" : "Descripción de la línea.",
+    "tipo" : "TEXTO"
+  }, {
+    "nombre" : "cantidad",
+    "etiquetas" : [ "Cant" ],
+    "descripcion" : "Cantidad de la línea.",
+    "tipo" : "NUMERO"
+  }, {
+    "nombre" : "importe",
+    "etiquetas" : [ "Monto" ],
+    "descripcion" : "Importe de la línea.",
+    "tipo" : "IMPORTE"
+  } ]
+}

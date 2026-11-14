@@ -1,0 +1,24 @@
+{
+  "cabecera" : {
+    "numeroComprobante" : "0007-00045821",
+    "cuitEmisor" : "30667788001",
+    "fechaEmision" : "2025-04-02",
+    "importeTotal" : 37857.90,
+    "numeroOrdenCompra" : null,
+    "numeroMedidor" : "00123456",
+    "fechaVencimiento" : "2025-04-18"
+  },
+  "detalle" : [ {
+    "concepto" : "Cargo fijo",
+    "cantidad" : 1,
+    "importe" : 2150.40
+  }, {
+    "concepto" : "Energía activa 350 kWh",
+    "cantidad" : 350,
+    "importe" : 34387.50
+  }, {
+    "concepto" : "Alumbrado público",
+    "cantidad" : 1,
+    "importe" : 1320.00
+  } ]
+}

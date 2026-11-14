@@ -1,0 +1,54 @@
+{
+  "camposCabecera" : [ {
+    "nombre" : "numeroComprobante",
+    "etiquetas" : [ "Comp. Nro" ],
+    "descripcion" : "Número del comprobante.",
+    "tipo" : "TEXTO"
+  }, {
+    "nombre" : "cuitEmisor",
+    "etiquetas" : [ "C.U.I.T. Nro" ],
+    "descripcion" : "CUIT de quien emite el comprobante.",
+    "tipo" : "CUIT"
+  }, {
+    "nombre" : "fechaEmision",
+    "etiquetas" : [ "Fecha de emisión" ],
+    "descripcion" : "Fecha de emisión.",
+    "tipo" : "FECHA"
+  }, {
+    "nombre" : "importeTotal",
+    "etiquetas" : [ "Total a pagar" ],
+    "descripcion" : "Importe total del comprobante.",
+    "tipo" : "IMPORTE"
+  }, {
+    "nombre" : "numeroOrdenCompra",
+    "etiquetas" : [ "Orden de compra" ],
+    "descripcion" : "Número de orden de compra del cliente.",
+    "tipo" : "TEXTO"
+  }, {
+    "nombre" : "numeroMedidor",
+    "etiquetas" : [ "N° de medidor" ],
+    "descripcion" : "Número de medidor del suministro.",
+    "tipo" : "TEXTO"
+  }, {
+    "nombre" : "fechaVencimiento",
+    "etiquetas" : [ "1er vto." ],
+    "descripcion" : "Primer vencimiento.",
+    "tipo" : "FECHA"
+  } ],
+  "camposDetalle" : [ {
+    "nombre" : "concepto",
+    "etiquetas" : [ "Concepto" ],
+    "descripcion" : "Descripción de la línea.",
+    "tipo" : "TEXTO"
+  }, {
+    "nombre" : "cantidad",
+    "etiquetas" : [ "Cantidad" ],
+    "descripcion" : "Cantidad de la línea.",
+    "tipo" : "NUMERO"
+  }, {
+    "nombre" : "importe",
+    "etiquetas" : [ "Importe" ],
+    "descripcion" : "Importe de la línea.",
+    "tipo" : "IMPORTE"
+  } ]
+}
