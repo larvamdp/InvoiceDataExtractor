@@ -6,7 +6,8 @@ Servicio REST (Spring Boot 3.5 / Java 21) que extrae campos de facturas argentin
 
 - Docker con Compose v2 (`docker compose`).
 - Para GPU: NVIDIA Container Toolkit. Sin GPU funciona en CPU, más lento.
-- Sin GPU (solo CPU) el modelo es muy lento: un PDF de texto de 1 página tardó ~7 minutos en una notebook. Con el timeout por defecto (`90s`) la API responde 504; subí `EXTRACTOR_OLLAMA_TIMEOUT` (p. ej. `600s`, en un archivo `.env` junto al compose o como variable de entorno).
+- Sin GPU (solo CPU) el modelo es muy lento. En una notebook, un PDF de texto simple de 1 página tardó ~7 minutos (completó), pero la factura `retail-a` (8 líneas de detalle) superó 600 s y la API respondió 504. Con el timeout por defecto (`90s`) casi todo responde 504: subí `EXTRACTOR_OLLAMA_TIMEOUT` (p. ej. `900s`, en un archivo `.env` junto al compose, ver `.env.example`, o como variable de entorno) y usá en `curl` un `--max-time` mayor que ese timeout. Si además subís la concurrencia, subí también `EXTRACTOR_CONCURRENCIA_ESPERAMAXIMA` (la espera en cola cuenta aparte y vence con 503).
+- Ajustes de CPU: bajar `EXTRACTOR_DOCUMENTO_MAXLADOPX` (p. ej. `1200`) y el DPI (`EXTRACTOR_DOCUMENTO_DPIIMAGEN`) reduce los tokens de imagen; bajar `EXTRACTOR_OLLAMA_NUMCTX` acelera pero un contexto menor al prompt lo trunca (el log avisa con "posible truncamiento de contexto" cuando `prompt_eval_count` alcanza `num_ctx`).
 - Espacio en disco: el modelo por defecto (`qwen3-vl:4b`, licencia Apache 2.0) ocupa ~3.3 GB.
 
 ## Puesta en marcha
@@ -29,7 +30,7 @@ Servicio REST (Spring Boot 3.5 / Java 21) que extrae campos de facturas argentin
    docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
    ```
 
-El contenedor `ollama` está solo en la red interna `ia` (sin salida a internet ni puertos publicados). Solo `extractor-api` expone el puerto 8080.
+El contenedor `ollama` está solo en la red interna `ia` (sin salida a internet ni puertos publicados). Solo `extractor-api` expone el puerto 8080 (`EXTRACTOR_PUERTO`, default `8080` en todas las interfaces; para solo loopback: `EXTRACTOR_PUERTO=127.0.0.1:8080`). La imagen de Ollama está fijada a la versión `0.40.16`.
 
 ## Uso
 
@@ -75,8 +76,12 @@ Toda la configuración está bajo `extractor.*` y se puede sobreescribir con var
 | `EXTRACTOR_DOCUMENTO_MAXLADOPX` | `extractor.documento.max-lado-px` | `2000` | Lado máximo de imagen enviada al LLM |
 | `EXTRACTOR_DOCUMENTO_UMBRALCARACTERESPORPAGINA` | `extractor.documento.umbral-caracteres-por-pagina` | `50` | Mínimo de caracteres para considerar texto utilizable |
 | `EXTRACTOR_DEBUG_LOGPROMPTS` | `extractor.debug.log-prompts` | `false` | Ver nota de confidencialidad |
+| `OLLAMA_NUM_PARALLEL` | (contenedor `ollama`) | `1` | Solicitudes en paralelo dentro de Ollama |
+| `EXTRACTOR_PUERTO` | (compose) | `8080` | Puerto publicado de la API |
 
-El tamaño máximo de archivo es 10 MB (`spring.servlet.multipart.max-file-size`, variable `SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE`).
+Copiá `.env.example` a `.env` para cambiar cualquiera de ellas con `docker compose`.
+
+El tamaño máximo de archivo es 10 MB (`SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE`; también `SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE`, default 11 MB). `SPRING_SERVLET_MULTIPART_FILE_SIZE_THRESHOLD` (default 11 MB) debe ser mayor o igual al máximo de la solicitud: si es menor, Tomcat escribe las partes a disco (`upload_*.tmp`).
 
 ## Confidencialidad
 
@@ -86,7 +91,7 @@ El tamaño máximo de archivo es 10 MB (`spring.servlet.multipart.max-file-size`
 
 ## Cómo medir
 
-El benchmark (`BenchmarkRunner`) envía cada documento de `benchmark/dataset/` al servicio en marcha, compara contra `esperado.json` y escribe un CSV en `benchmark/resultados/` (no versionado) con un resumen por modo (p50/p95 de `totalMs`, % de aciertos, inventados, % de documentos <= 60 s).
+El benchmark (`BenchmarkRunner`) envía cada documento de `benchmark/dataset/` al servicio en marcha, compara contra `esperado.json` y escribe un CSV en `benchmark/resultados/` (no versionado; columnas `documento,forma,modo,qrPresente,status,totalMs,deteccionMs,qrMs,extraccionTextoMs,rasterizacionMs,llmMs,esperaColaMs,aciertos,camposTotales,inventados,omitidos,cumple60s`) con un resumen por modo (p50/p95 de `totalMs`, % de aciertos, inventados, % de documentos <= 60 s).
 
 Dataset completo (12 documentos):
 
@@ -106,7 +111,7 @@ MVN_DOCKER_ARGS="--network host" ./scripts/mvn.sh -q test-compile exec:java -Dex
   -Dexec.args="--url http://localhost:8080 --filtro retail-a"
 ```
 
-Concurrencia: agregar `--concurrencia 2` a `-Dexec.args` y levantar el servicio con `EXTRACTOR_CONCURRENCIA_MAXLLM=2` (si no, las solicitudes esperan en cola). Otras opciones: `--dataset`, `--salida`.
+Concurrencia: agregar `--concurrencia N` a `-Dexec.args` y levantar el servicio con `EXTRACTOR_CONCURRENCIA_MAXLLM=N` **y** `OLLAMA_NUM_PARALLEL=N` (si no, las solicitudes esperan en cola o Ollama las serializa). Otras opciones: `--dataset`, `--salida`.
 
 Comparar modelos: reiniciar el servicio con otro `EXTRACTOR_OLLAMA_MODELO` (el modelo debe estar descargado en Ollama), volver a correr el benchmark y comparar los CSV. Con CPU y modelos grandes subir `EXTRACTOR_OLLAMA_TIMEOUT` (el benchmark espera hasta 15 min por documento).
 
