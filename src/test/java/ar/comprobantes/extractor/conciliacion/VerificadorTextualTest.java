@@ -37,4 +37,18 @@ class VerificadorTextualTest {
     @Test void importeAusente() {
         assertThat(verificador.aparece("99", new BigDecimal("99"), TipoCampo.IMPORTE, "TOTAL $ 15.000,00")).isFalse();
     }
+
+    @Test void numeroDespuesDeGuionNoTomaElGuionComoSigno() {
+        assertThat(verificador.aparece("12345", new BigDecimal("12345"), TipoCampo.NUMERO,
+            "Comprobante 0003-00012345")).isTrue();
+    }
+
+    @Test void importeNegativoSigueReconocido() {
+        assertThat(verificador.aparece("-500", new BigDecimal("-500"), TipoCampo.IMPORTE, "Descuento -500,00")).isTrue();
+    }
+
+    @Test void cuitNoSeEncuentraDentroDeUnCaeDe14Digitos() {
+        assertThat(verificador.aparece("30712345671", "30712345671", TipoCampo.CUIT,
+            "CAE 73307123456712")).isFalse();
+    }
 }

@@ -32,15 +32,17 @@ public final class BenchmarkRunner {
 
     private static final ObjectMapper OM = new ObjectMapper();
     private static final Duration TIMEOUT_HTTP = Duration.ofMinutes(15);
-    private static final String ENCABEZADO = "documento,forma,modo,qrPresente,status,totalMs,llmMs,esperaColaMs,"
+    static final String ENCABEZADO = "documento,forma,modo,qrPresente,status,totalMs,deteccionMs,qrMs,"
+            + "extraccionTextoMs,rasterizacionMs,llmMs,esperaColaMs,"
             + "aciertos,camposTotales,inventados,omitidos,cumple60s";
 
-    record Fila(String documento, String forma, String modo, String qr, int status, long totalMs, long llmMs,
-                long esperaColaMs, int aciertos, int camposTotales, int inventados, int omitidos,
+    record Fila(String documento, String forma, String modo, String qr, int status, long totalMs, long deteccionMs,
+                long qrMs, long extraccionTextoMs, long rasterizacionMs, long llmMs, long esperaColaMs, int aciertos, int camposTotales, int inventados, int omitidos,
                 boolean cumple60s) {
         String csv() {
             return String.join(",", documento, forma, modo, qr, String.valueOf(status), String.valueOf(totalMs),
-                    String.valueOf(llmMs), String.valueOf(esperaColaMs), String.valueOf(aciertos),
+                    String.valueOf(deteccionMs), String.valueOf(qrMs), String.valueOf(extraccionTextoMs),
+                    String.valueOf(rasterizacionMs), String.valueOf(llmMs), String.valueOf(esperaColaMs), String.valueOf(aciertos),
                     String.valueOf(camposTotales), String.valueOf(inventados), String.valueOf(omitidos),
                     String.valueOf(cumple60s));
         }
@@ -107,7 +109,7 @@ public final class BenchmarkRunner {
         } catch (IOException e) {
             String id = dir.getFileName().toString();
             System.out.println("<- " + id + " ERROR al leer el dataset: " + e.getClass().getSimpleName());
-            return new Fila(id, id.substring(id.lastIndexOf('-') + 1), "-", "-", -1, 0, 0, 0, 0, 0, 0, 0, false);
+            return new Fila(id, id.substring(id.lastIndexOf('-') + 1), "-", "-", -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false);
         }
     }
 
@@ -137,7 +139,7 @@ public final class BenchmarkRunner {
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
             long medido = (System.nanoTime() - t0) / 1_000_000;
             if (resp.statusCode() != 200) {
-                Fila f = new Fila(id, forma, "-", "-", resp.statusCode(), medido, 0, 0, 0, 0, 0, 0, false);
+                Fila f = new Fila(id, forma, "-", "-", resp.statusCode(), medido, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false);
                 System.out.println("<- " + id + " status " + resp.statusCode());
                 return f;
             }
@@ -153,12 +155,13 @@ public final class BenchmarkRunner {
             System.out.println("<- " + id + " " + total + " ms, " + r.aciertos() + "/" + r.camposTotales());
             return new Fila(id, forma, meta.path("modoProcesamiento").asText("-"),
                     String.valueOf(json.path("qrArca").path("presente").asBoolean(false)), 200, total,
-                    t.path("llm").asLong(0), t.path("esperaCola").asLong(0), r.aciertos(), r.camposTotales(),
+                    t.path("deteccion").asLong(0), t.path("qr").asLong(0), t.path("extraccionTexto").asLong(0),
+                    t.path("rasterizacion").asLong(0), t.path("llm").asLong(0), t.path("esperaCola").asLong(0), r.aciertos(), r.camposTotales(),
                     r.inventados(), r.omitidos(), total <= 60_000);
         } catch (Exception e) {
             long medido = (System.nanoTime() - t0) / 1_000_000;
             System.out.println("<- " + id + " ERROR " + e.getClass().getSimpleName());
-            return new Fila(id, forma, "-", "-", -1, medido, 0, 0, 0, 0, 0, 0, false);
+            return new Fila(id, forma, "-", "-", -1, medido, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false);
         }
     }
 

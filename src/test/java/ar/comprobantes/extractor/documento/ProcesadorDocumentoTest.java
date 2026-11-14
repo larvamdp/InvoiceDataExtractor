@@ -167,6 +167,21 @@ class ProcesadorDocumentoTest {
     }
 
     @Test
+    void pngTransparenteRedimensionadoQuedaConFondoBlanco() {
+        BufferedImage transparente = new BufferedImage(400, 300, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage r = ProcesadorDocumento.limitarLado(transparente, 100);
+        assertThat(r.getRGB(0, 0) & 0xFFFFFF).isEqualTo(0xFFFFFF);
+        assertThat(r.getRGB(r.getWidth() - 1, r.getHeight() - 1) & 0xFFFFFF).isEqualTo(0xFFFFFF);
+    }
+
+    @Test
+    void pngTransparenteRotadoQuedaConFondoBlanco() {
+        BufferedImage transparente = new BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage r = ProcesadorDocumento.aplicarOrientacion(transparente, 6);
+        assertThat(r.getRGB(0, 0) & 0xFFFFFF).isEqualTo(0xFFFFFF);
+    }
+
+    @Test
     void imagenChicaNoSeRedimensiona() throws IOException {
         DocumentoProcesado d = procesador.procesar(png(800, 600));
 

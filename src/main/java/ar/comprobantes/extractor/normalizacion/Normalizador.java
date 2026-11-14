@@ -18,8 +18,9 @@ public class Normalizador {
     private static final Pattern FECHA_ISO = Pattern.compile("^(\\d{4})-(\\d{1,2})-(\\d{1,2})$");
     private static final Pattern FECHA_TEXTO =
         Pattern.compile("^(\\d{1,2})\\s+de\\s+(\\p{L}+)\\s+de\\s+(\\d{4})$");
-    private static final Pattern AGRUPADO = Pattern.compile("^\\d{1,3}([.,]\\d{3})+$");
-    private static final Pattern DECIMAL = Pattern.compile("^(.*)[.,](\\d{1,2})$");
+    private static final Pattern MARCADORES_MONEDA =
+        Pattern.compile("U\\$S|USD|ARS|pesos|\\$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SOLO_NUMERICO = Pattern.compile("^[\\d.,]+$");
     private static final Pattern SOLO_DIGITOS = Pattern.compile("^\\d+$");
 
     private static final Map<String, Integer> MESES = Map.ofEntries(
@@ -48,20 +49,12 @@ public class Normalizador {
             negativo = true;
             s = s.substring(1, s.length() - 1);
         }
-        s = s.replaceAll("[\\s$\\p{L}]", "");
+        s = MARCADORES_MONEDA.matcher(s).replaceAll("").replaceAll("\\s", "");
         if (s.startsWith("-")) {
             negativo = true;
             s = s.substring(1);
         }
-        String limpio = null;
-        Matcher dec = DECIMAL.matcher(s);
-        if (dec.matches() && !dec.group(1).isEmpty() && esEntero(dec.group(1))) {
-            limpio = dec.group(1).replaceAll("[.,]", "") + "." + dec.group(2);
-        } else if (AGRUPADO.matcher(s).matches()) {
-            limpio = s.replaceAll("[.,]", "");
-        } else if (SOLO_DIGITOS.matcher(s).matches()) {
-            limpio = s;
-        }
+        String limpio = limpiarNumero(s);
         if (limpio == null) {
             return noInterpretable(crudo, tipo);
         }
@@ -69,8 +62,62 @@ public class Normalizador {
         return new ResultadoNormalizacion(negativo ? valor.negate() : valor, null);
     }
 
-    private static boolean esEntero(String parteEntera) {
-        return SOLO_DIGITOS.matcher(parteEntera).matches() || AGRUPADO.matcher(parteEntera).matches();
+    /** Devuelve el número con punto decimal y sin separadores, o null si no es interpretable. */
+    private static String limpiarNumero(String s) {
+        if (!SOLO_NUMERICO.matcher(s).matches()) {
+            return null;
+        }
+        int ultimoPunto = s.lastIndexOf('.');
+        int ultimaComa = s.lastIndexOf(',');
+        if (ultimoPunto >= 0 && ultimaComa >= 0) {
+            char decimal = ultimoPunto > ultimaComa ? '.' : ',';
+            char miles = decimal == '.' ? ',' : '.';
+            int pos = Math.max(ultimoPunto, ultimaComa);
+            String entera = s.substring(0, pos);
+            String frac = s.substring(pos + 1);
+            if (!agrupado(entera, miles) || frac.isEmpty() || frac.indexOf(decimal) >= 0
+                || frac.indexOf(miles) >= 0) {
+                return null;
+            }
+            return entera.replace(String.valueOf(miles), "") + "." + frac;
+        }
+        if (ultimaComa >= 0) {
+            return unSeparador(s, ',');
+        }
+        if (ultimoPunto >= 0) {
+            return unSeparador(s, '.');
+        }
+        return s;
+    }
+
+    /** Solo se usa un tipo de separador: una aparición es decimal (salvo agrupado inequívoco con punto). */
+    private static String unSeparador(String s, char sep) {
+        long cantidad = s.chars().filter(c -> c == sep).count();
+        int pos = s.indexOf(sep);
+        String entera = s.substring(0, pos);
+        String frac = s.substring(pos + 1);
+        if (cantidad > 1) {
+            return agrupado(s, sep) ? s.replace(String.valueOf(sep), "") : null;
+        }
+        if (entera.isEmpty() || frac.isEmpty()) {
+            return null;
+        }
+        boolean miles = sep == '.' && frac.length() == 3 && agrupado(s, sep);
+        return miles ? entera + frac : entera + "." + frac;
+    }
+
+    /** Grupos de 3 dígitos separados por sep, primer grupo de 1 a 3 dígitos sin cero inicial. */
+    private static boolean agrupado(String s, char sep) {
+        String[] grupos = s.split(Pattern.quote(String.valueOf(sep)), -1);
+        if (grupos.length < 2 || grupos[0].isEmpty() || grupos[0].length() > 3 || grupos[0].charAt(0) == '0') {
+            return grupos.length == 1 && SOLO_DIGITOS.matcher(s).matches() && !s.isEmpty();
+        }
+        for (int i = 0; i < grupos.length; i++) {
+            if (!grupos[i].matches(i == 0 ? "\\d{1,3}" : "\\d{3}")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private ResultadoNormalizacion fecha(String crudo) {

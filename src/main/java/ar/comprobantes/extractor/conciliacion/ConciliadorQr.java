@@ -8,7 +8,11 @@ import ar.comprobantes.extractor.llm.ValorLlm;
 import ar.comprobantes.extractor.normalizacion.Normalizador;
 import ar.comprobantes.extractor.normalizacion.ResultadoNormalizacion;
 import ar.comprobantes.extractor.qr.DatosQrArca;
+import ar.comprobantes.extractor.normalizacion.ValidadorCuit;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -58,13 +62,19 @@ public class ConciliadorQr {
     private static Object normalizarQr(Object valor, TipoCampo tipo) {
         try {
             return switch (tipo) {
-                case TEXTO, FECHA -> valor.toString();
-                case CUIT -> valor.toString().replaceAll("\\D", "");
+                case TEXTO -> valor.toString();
+                case FECHA -> LocalDate.parse(valor.toString(), DateTimeFormatter.ISO_LOCAL_DATE).toString();
+                case CUIT -> cuitValido(valor.toString());
                 case IMPORTE, NUMERO -> valor instanceof BigDecimal b ? b : new BigDecimal(valor.toString());
             };
-        } catch (NumberFormatException e) {
-            return null; // la clave elegida por el LLM no es numérica: no se aplica el QR
+        } catch (NumberFormatException | DateTimeParseException e) {
+            return null; // la clave elegida por el LLM no es del tipo pedido: no se aplica el QR
         }
+    }
+
+    private static String cuitValido(String valor) {
+        String digitos = valor.replaceAll("\\D", "");
+        return digitos.length() == 11 && ValidadorCuit.esValido(digitos) ? digitos : null;
     }
 
     private static String texto(Object valor) {

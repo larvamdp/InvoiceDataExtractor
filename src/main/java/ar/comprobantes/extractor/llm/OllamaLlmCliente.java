@@ -94,8 +94,13 @@ public class OllamaLlmCliente implements LlmCliente {
             log.warn("Respuesta de Ollama sin message.content (modelo={})", config.modelo());
             throw new LlmNoDisponibleException(MSG_NO_DISPONIBLE);
         }
-        log.info("Ollama completó: modelo={}, imagenes={}, duracionMs={}, eval_count={}",
-            config.modelo(), cantImagenes, ms, respuesta.path("eval_count").asText("n/d"));
+        JsonNode promptEval = respuesta.path("prompt_eval_count");
+        log.info("Ollama completó: modelo={}, imagenes={}, duracionMs={}, prompt_eval_count={}, eval_count={}",
+            config.modelo(), cantImagenes, ms, promptEval.asText("n/d"), respuesta.path("eval_count").asText("n/d"));
+        if (promptEval.isNumber() && promptEval.asInt() >= config.numCtx()) {
+            log.warn("posible truncamiento de contexto: prompt_eval_count={} >= num_ctx={} (modelo={})",
+                promptEval.asInt(), config.numCtx(), config.modelo());
+        }
         if (logPrompts) {
             log.debug("ADVERTENCIA: extractor.debug.log-prompts activo. Respuesta: {}", contenido.asText());
         }

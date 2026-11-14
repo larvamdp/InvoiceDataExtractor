@@ -3,6 +3,8 @@ package ar.comprobantes.extractor.api;
 import ar.comprobantes.extractor.error.ExtraccionException;
 import jakarta.servlet.ServletException;
 import org.slf4j.Logger;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
+import org.springframework.util.unit.DataSize;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -24,6 +26,12 @@ public class ManejadorErrores {
 
     private static final Logger log = LoggerFactory.getLogger(ManejadorErrores.class);
 
+    private final MultipartProperties multipart;
+
+    public ManejadorErrores(MultipartProperties multipart) {
+        this.multipart = multipart;
+    }
+
     @ExceptionHandler(ExtraccionException.class)
     ResponseEntity<ProblemDetail> extraccion(ExtraccionException e) {
         return responder(e, problema(e.status(), e.titulo(), e.getMessage()));
@@ -32,7 +40,7 @@ public class ManejadorErrores {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ResponseEntity<ProblemDetail> tamano(MaxUploadSizeExceededException e) {
         return responder(e, problema(HttpStatus.PAYLOAD_TOO_LARGE, "Documento demasiado grande",
-            "El documento supera el tamaño máximo permitido de 10 MB."));
+            "El documento supera el tamaño máximo permitido de " + tamanoMaximo() + "."));
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)
@@ -92,6 +100,16 @@ public class ManejadorErrores {
         log.error("Error interno inesperado: causas={} frames:{}", cadena, frames);
         return ResponseEntity.status(500).contentType(MediaType.APPLICATION_PROBLEM_JSON)
             .body(problema(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", "Error interno."));
+    }
+
+    private String tamanoMaximo() {
+        DataSize max = multipart.getMaxFileSize();
+        if (max == null) {
+            return "el configurado";
+        }
+        long bytes = max.toBytes();
+        long mb = 1024L * 1024L;
+        return bytes % mb == 0 ? (bytes / mb) + " MB" : bytes % 1024 == 0 ? (bytes / 1024) + " KB" : bytes + " bytes";
     }
 
     private static ProblemDetail problema(HttpStatusCode status, String titulo, String detalle) {

@@ -10,6 +10,8 @@ import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import ar.comprobantes.extractor.api.dto.TipoCampo;
 
 class NormalizadorTest {
 
@@ -18,7 +20,10 @@ class NormalizadorTest {
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
         "1.234,56|1234.56", "$ 15.000,00|15000.00", "15.000|15000", "1,234.56|1234.56",
-        "350|350", "-1.500,5|-1500.5", "(1.500,00)|-1500.00", "12,5|12.5"})
+        "350|350", "-1.500,5|-1500.5", "(1.500,00)|-1500.00", "12,5|12.5",
+        "0,125|0.125", "1,500|1.500", "1.234,567|1234.567", "45,1234|45.1234", "1.234.567|1234567",
+        "1,234,567|1234567", "0.125|0.125", "1.5|1.5", "1234.567|1234.567", "USD 1.500,50|1500.50",
+        "U$S 10|10", "ARS 1.000|1000", "1.000 pesos|1000", "$1.234,56|1234.56"})
     void normalizaImporte(String crudo, String esperado) {
         ResultadoNormalizacion r = n.normalizar(crudo, IMPORTE);
         assertThat((BigDecimal) r.valor()).isEqualByComparingTo(esperado);
@@ -88,5 +93,13 @@ class NormalizadorTest {
         assertThat(r.valor()).isNull();
         assertThat(r.observacion()).isNull();
         assertThat(n.normalizar("  ", FECHA).valor()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"A-0003", "12abc", "1.2.3", "1,5.5,5", "1.23,4.5", "--5", "1 x"})
+    void numeroConLetrasOFormatoRaroNoEsInterpretable(String crudo) {
+        ResultadoNormalizacion r = n.normalizar(crudo, TipoCampo.NUMERO);
+        assertThat(r.valor()).isEqualTo(crudo);
+        assertThat(r.observacion()).contains("como NUMERO");
     }
 }

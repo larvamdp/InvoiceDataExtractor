@@ -12,11 +12,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class VerificadorTextual {
 
-    private static final Pattern TOKEN_NUMERICO = Pattern.compile("-?\\(?\\$?\\s?\\d[\\d.,]*");
+    private static final Pattern TOKEN_NUMERICO = Pattern.compile("(?:(?<![\\d\\p{L}])-)?\\(?\\$?\\s?\\d[\\d.,]*");
     private static final Pattern TOKEN_FECHA = Pattern.compile(
         "\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4}|\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}\\s+de\\s+\\p{L}+\\s+de\\s+\\d{4}",
         Pattern.CASE_INSENSITIVE);
-    private static final Pattern TOKEN_CUIT = Pattern.compile("\\d{2}-?\\d{8}-?\\d");
+    private static final Pattern TOKEN_CUIT = Pattern.compile("(?<!\\d)\\d{2}-?\\d{8}-?\\d(?!\\d)");
 
     private final Normalizador normalizador;
 

@@ -5,6 +5,7 @@ import ar.comprobantes.extractor.config.ExtractorProperties;
 import ar.comprobantes.extractor.error.DocumentoDemasiadoGrandeException;
 import ar.comprobantes.extractor.error.DocumentoInvalidoException;
 import ar.comprobantes.extractor.error.ExtraccionException;
+import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
@@ -166,6 +167,8 @@ public class ProcesadorDocumento {
         BufferedImage destino = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = destino.createGraphics();
         try {
+            g.setColor(Color.WHITE);
+            g.fillRect(0, 0, w, h);
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             g.drawImage(img, 0, 0, w, h, null);
@@ -248,6 +251,8 @@ public class ProcesadorDocumento {
         BufferedImage destino = new BufferedImage(intercambia ? h : w, intercambia ? w : h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = destino.createGraphics();
         try {
+            g.setColor(Color.WHITE);
+            g.fillRect(0, 0, destino.getWidth(), destino.getHeight());
             g.drawImage(img, t, null);
         } finally {
             g.dispose();

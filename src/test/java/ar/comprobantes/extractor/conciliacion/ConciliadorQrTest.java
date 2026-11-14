@@ -116,4 +116,25 @@ class ConciliadorQrTest {
         assertThat((BigDecimal) r.valor()).isEqualByComparingTo("12345");
         assertThat(r.fuente()).isEqualTo(Fuente.DOCUMENTO);
     }
+
+    @Test void fechaMapeadaAClaveNoFechaUsaDocumento() {
+        ValorCampo r = conciliador.conciliar(campo("fechaEmision", TipoCampo.FECHA),
+            new ValorLlm("02/10/2026", "Fecha.", List.of("nroCmp")), qr);
+        assertThat(r.valor()).isEqualTo("2026-10-02");
+        assertThat(r.fuente()).isEqualTo(Fuente.DOCUMENTO);
+    }
+
+    @Test void cuitMapeadoAClaveNoCuitUsaDocumento() {
+        ValorCampo r = conciliador.conciliar(campo("cuitEmisor", TipoCampo.CUIT),
+            new ValorLlm("30-71234567-1", "CUIT.", List.of("codAut")), qr);
+        assertThat(r.valor()).isEqualTo("30712345671");
+        assertThat(r.fuente()).isEqualTo(Fuente.DOCUMENTO);
+    }
+
+    @Test void fechaDelQrIsoSeUsa() {
+        ValorCampo r = conciliador.conciliar(campo("fechaEmision", TipoCampo.FECHA),
+            new ValorLlm("02/10/2026", "Fecha.", List.of("fecha")), qr);
+        assertThat(r.valor()).isEqualTo("2026-10-02");
+        assertThat(r.fuente()).isEqualTo(Fuente.QR_ARCA);
+    }
 }

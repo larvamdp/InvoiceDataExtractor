@@ -17,7 +17,11 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
+@ExtendWith(OutputCaptureExtension.class)
 class OllamaLlmClienteTest {
 
     private WireMockServer servidor;
@@ -142,5 +146,21 @@ class OllamaLlmClienteTest {
             new ExtractorProperties.Debug(false));
         var c = new OllamaLlmCliente(props, Duration.ofMillis(300));
         assertThatThrownBy(() -> c.completar(prompt(List.of()))).isInstanceOf(LlmNoDisponibleException.class);
+    }
+
+    @Test
+    void advierteSiElPromptLlenaElContexto(CapturedOutput salida) {
+        servidor.stubFor(post("/api/chat").willReturn(okJson(
+            "{\"message\":{\"content\":\"{}\"},\"eval_count\":12,\"prompt_eval_count\":8192}")));
+        cliente(servidor.baseUrl(), Duration.ofSeconds(5), null).completar(prompt(List.of()));
+        assertThat(salida.getAll()).contains("posible truncamiento de contexto").contains("prompt_eval_count=8192");
+    }
+
+    @Test
+    void sinAdvertenciaSiElPromptCabeEnElContexto(CapturedOutput salida) {
+        servidor.stubFor(post("/api/chat").willReturn(okJson(
+            "{\"message\":{\"content\":\"{}\"},\"eval_count\":12,\"prompt_eval_count\":900}")));
+        cliente(servidor.baseUrl(), Duration.ofSeconds(5), null).completar(prompt(List.of()));
+        assertThat(salida.getAll()).doesNotContain("posible truncamiento").contains("prompt_eval_count=900");
     }
 }
