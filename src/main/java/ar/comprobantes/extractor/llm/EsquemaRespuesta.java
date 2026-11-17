@@ -17,13 +17,15 @@ public class EsquemaRespuesta {
     public ObjectNode para(SolicitudExtraccion solicitud, boolean hayQr) {
         ObjectNode raiz = F.objectNode();
         raiz.put("type", "object");
-        raiz.set("required", textos("cabecera", "detalle"));
+        // Con QR, clavesQr es obligatorio y va antes del detalle: si fuera opcional y al final, el modelo podría
+        // cerrar el JSON sin escribirlo y se perdería la conciliación con el QR en silencio.
+        raiz.set("required", hayQr ? textos("cabecera", "clavesQr", "detalle") : textos("cabecera", "detalle"));
         ObjectNode props = raiz.putObject("properties");
         props.set("cabecera", cabecera(solicitud.camposCabecera()));
-        props.set("detalle", detalle(solicitud.camposDetalle()));
         if (hayQr) {
             props.set("clavesQr", clavesQr(solicitud.camposCabecera()));
         }
+        props.set("detalle", detalle(solicitud.camposDetalle()));
         return raiz;
     }
 
