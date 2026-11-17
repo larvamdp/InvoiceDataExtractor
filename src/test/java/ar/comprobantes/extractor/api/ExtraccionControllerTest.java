@@ -33,7 +33,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class ExtraccionControllerTest {
 
     private static final String LLM_OK = """
-        {"cabecera":{"numeroComprobante":{"valor":"0003-00012345","descripcion":"Nro","clavesQr":[]}},"detalle":[]}
+        {"cabecera":{"numeroComprobante":"0003-00012345"},"detalle":[]}
         """;
     private static final String SOLICITUD_OK =
         "{\"camposCabecera\":[{\"nombre\":\"numeroComprobante\",\"etiquetas\":[\"Factura\"]}]}";

@@ -52,8 +52,7 @@ class ExtraccionCompletaHttpTest {
 
     @Test
     void extraccionPorHttpConOllamaSimulado() throws Exception {
-        String contenido = "{\"cabecera\":{\"importeTotal\":{\"valor\":\"15.000,00\",\"descripcion\":null,"
-            + "\"clavesQr\":[]}},\"detalle\":[]}";
+        String contenido = "{\"cabecera\":{\"importeTotal\":\"15.000,00\"},\"detalle\":[]}";
         String respuesta = new ObjectMapper().writeValueAsString(
             Map.of("message", Map.of("role", "assistant", "content", contenido),
                 "eval_count", 10, "prompt_eval_count", 100));

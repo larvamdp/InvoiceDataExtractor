@@ -57,12 +57,10 @@ class ExtraccionServiceTest {
         + "\"nroDocRec\":20111111112,\"tipoCodAut\":\"E\",\"codAut\":70123456789012}";
 
     private static final String JSON_OK = """
-        {"cabecera":{"importeTotal":{"valor":"15.000,00","descripcion":"Total","clavesQr":["importe"]},
-                     "numero":{"valor":"0003-00012345","descripcion":"Nro","clavesQr":[]}},
-         "detalle":[{"descripcion":{"valor":"Servicio de consultoria","descripcion":null,"clavesQr":[]},
-                     "importe":{"valor":"1.234,56","descripcion":null,"clavesQr":[]}},
-                    {"descripcion":{"valor":"Servicio de consultoria","descripcion":null,"clavesQr":[]},
-                     "importe":{"valor":"2.000,00","descripcion":null,"clavesQr":[]}}]}
+        {"cabecera":{"importeTotal":"15.000,00","numero":"0003-00012345"},
+         "detalle":[{"descripcion":"Servicio de consultoria","importe":"1.234,56"},
+                    {"descripcion":"Servicio de consultoria","importe":"2.000,00"}],
+         "clavesQr":{"importeTotal":["importe"]}}
         """;
 
     private final AtomicInteger llamadas = new AtomicInteger();
@@ -111,7 +109,7 @@ class ExtraccionServiceTest {
         ResultadoExtraccion r = servicio(n -> JSON_OK).extraer(pdf(true), solicitud());
         assertThat(r.cabecera().get("importeTotal").fuente()).isEqualTo(Fuente.QR_ARCA);
         assertThat(r.cabecera().get("numero").fuente()).isEqualTo(Fuente.DOCUMENTO);
-        assertThat(r.cabecera().get("numero").descripcion()).doesNotContain("verificar");
+        assertThat(r.cabecera().get("numero").descripcion()).isNull();
         assertThat(r.qrArca().presente()).isTrue();
         assertThat(r.metadatos().modoProcesamiento()).isEqualTo(ModoProcesamiento.TEXTO);
         assertThat(r.metadatos().tipoDocumento()).isEqualTo("PDF");
@@ -178,8 +176,7 @@ class ExtraccionServiceTest {
     @Test
     void valorInventadoSeMarca() throws Exception {
         String json = """
-            {"cabecera":{"importeTotal":{"valor":"15.000,00","descripcion":null,"clavesQr":[]},
-                         "numero":{"valor":"Energía reactiva","descripcion":"Nro","clavesQr":[]}},
+            {"cabecera":{"importeTotal":"15.000,00","numero":"Energía reactiva"},
              "detalle":[]}
             """;
         ResultadoExtraccion r = servicio(n -> json).extraer(pdf(false), solicitud());
@@ -215,8 +212,7 @@ class ExtraccionServiceTest {
     @Test
     void modoImagenSinVerificacion() throws Exception {
         String json = """
-            {"cabecera":{"importeTotal":{"valor":"15.000,00","descripcion":null,"clavesQr":[]},
-                         "numero":{"valor":"Energía reactiva","descripcion":null,"clavesQr":[]}},
+            {"cabecera":{"importeTotal":"15.000,00","numero":"Energía reactiva"},
              "detalle":[]}
             """;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
