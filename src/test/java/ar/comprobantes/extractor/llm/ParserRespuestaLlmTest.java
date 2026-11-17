@@ -10,8 +10,12 @@ import ar.comprobantes.extractor.error.RespuestaLlmInvalidaException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ParserRespuestaLlmTest {
+
+    private static final ValorLlm NO_ENCONTRADO = new ValorLlm(null, "Dato no encontrado.", List.of());
 
     private final ParserRespuestaLlm parser = new ParserRespuestaLlm(new ObjectMapper());
 
@@ -22,62 +26,87 @@ class ParserRespuestaLlmTest {
     private final SolicitudExtraccion solicitud = new SolicitudExtraccion(
             List.of(campo("numeroComprobante"), campo("fechaEmision")), List.of(campo("descripcion")));
 
+    private ValorLlm numero(String json) {
+        return parser.parsear(json, solicitud).cabecera().get("numeroComprobante");
+    }
+
     @Test
     void parseaRespuestaCompleta() {
         String json = """
-                {"cabecera":{
-                  "numeroComprobante":{"valor":"0001-00012345","descripcion":null,"clavesQr":["ptoVta","nroCmp"]},
-                  "fechaEmision":{"valor":"01/05/2024","descripcion":"Se usó la fecha de emisión.","clavesQr":[]}},
-                 "detalle":[{"descripcion":{"valor":"Tornillos","descripcion":null}},
-                            {"descripcion":{"valor":"Tuercas","descripcion":null}}]}
+                {"cabecera":{"numeroComprobante":"0003-00012345","fechaEmision":"01/05/2024"},
+                 "detalle":[{"descripcion":"Tornillos"},{"descripcion":"Tuercas"}],
+                 "clavesQr":{"numeroComprobante":["ptoVta","nroCmp"]}}
                 """;
         RespuestaLlm r = parser.parsear(json, solicitud);
-        assertThat(r.cabecera().get("numeroComprobante").valor()).isEqualTo("0001-00012345");
-        assertThat(r.cabecera().get("numeroComprobante").clavesQr()).containsExactly("ptoVta", "nroCmp");
-        assertThat(r.cabecera().get("fechaEmision").descripcion()).isEqualTo("Se usó la fecha de emisión.");
+        assertThat(r.cabecera().get("numeroComprobante"))
+                .isEqualTo(new ValorLlm("0003-00012345", null, List.of("ptoVta", "nroCmp")));
+        assertThat(r.cabecera().get("fechaEmision")).isEqualTo(new ValorLlm("01/05/2024", null, List.of()));
         assertThat(r.detalle()).hasSize(2);
-        assertThat(r.detalle().get(1).get("descripcion").valor()).isEqualTo("Tuercas");
+        assertThat(r.detalle().get(1).get("descripcion")).isEqualTo(new ValorLlm("Tuercas", null, List.of()));
     }
 
     @Test
     void campoOmitidoQuedaNoEncontrado() {
         String json = """
-                {"cabecera":{"numeroComprobante":{"valor":"1","descripcion":null,"clavesQr":[]}},"detalle":[{}]}
+                {"cabecera":{"numeroComprobante":"1"},"detalle":[{}]}
                 """;
         RespuestaLlm r = parser.parsear(json, solicitud);
-        assertThat(r.cabecera().get("fechaEmision"))
-                .isEqualTo(new ValorLlm(null, "Dato no encontrado.", List.of()));
-        assertThat(r.detalle().get(0).get("descripcion").valor()).isNull();
-        assertThat(r.detalle().get(0).get("descripcion").descripcion()).isEqualTo("Dato no encontrado.");
+        assertThat(r.cabecera().get("fechaEmision")).isEqualTo(NO_ENCONTRADO);
+        assertThat(r.detalle().get(0).get("descripcion")).isEqualTo(NO_ENCONTRADO);
+    }
+
+    @Test
+    void campoNullQuedaNoEncontrado() {
+        assertThat(numero("{\"cabecera\":{\"numeroComprobante\":null},\"detalle\":[]}")).isEqualTo(NO_ENCONTRADO);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"  \"", "\"\"", "\"null\"", "\"NULL\"", "\" Null \""})
+    void valorVacioOLiteralNullQuedaNoEncontrado(String valor) {
+        assertThat(numero("{\"cabecera\":{\"numeroComprobante\":" + valor + "},\"detalle\":[]}"))
+                .isEqualTo(NO_ENCONTRADO);
+    }
+
+    @Test
+    void valorNumericoSeAceptaComoTexto() {
+        assertThat(numero("{\"cabecera\":{\"numeroComprobante\":12100.5},\"detalle\":[]}").valor())
+                .isEqualTo("12100.5");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"valor\":\"1\"}", "[\"1\"]", "true"})
+    void valorNoTextualQuedaNoEncontrado(String valor) {
+        assertThat(numero("{\"cabecera\":{\"numeroComprobante\":" + valor + "},\"detalle\":[]}"))
+                .isEqualTo(NO_ENCONTRADO);
     }
 
     @Test
     void campoExtraSeIgnora() {
         String json = """
-                {"cabecera":{"numeroComprobante":{"valor":"1"},"fechaEmision":{"valor":"2"},
-                 "inventado":{"valor":"x"}},"detalle":[]}
+                {"cabecera":{"numeroComprobante":"1","fechaEmision":"2","inventado":"x"},"detalle":[]}
                 """;
-        RespuestaLlm r = parser.parsear(json, solicitud);
-        assertThat(r.cabecera()).containsOnlyKeys("numeroComprobante", "fechaEmision");
+        assertThat(parser.parsear(json, solicitud).cabecera()).containsOnlyKeys("numeroComprobante", "fechaEmision");
     }
 
     @Test
     void clavesQrInvalidasSeFiltran() {
         String json = """
-                {"cabecera":{"numeroComprobante":{"valor":"1","clavesQr":["nroCmp","inventada"]}},"detalle":[]}
+                {"cabecera":{"numeroComprobante":"1","fechaEmision":"2"},"detalle":[{"descripcion":"x"}],
+                 "clavesQr":{"numeroComprobante":["nroCmp","inventada","nroCmp",7],
+                             "fechaEmision":"fecha","descripcion":["importe"],"otro":["importe"]}}
                 """;
-        assertThat(parser.parsear(json, solicitud).cabecera().get("numeroComprobante").clavesQr())
-                .containsExactly("nroCmp");
+        RespuestaLlm r = parser.parsear(json, solicitud);
+        assertThat(r.cabecera().get("numeroComprobante").clavesQr()).containsExactly("nroCmp");
+        assertThat(r.cabecera().get("fechaEmision").clavesQr()).isEmpty();
+        assertThat(r.detalle().get(0).get("descripcion").clavesQr()).isEmpty();
     }
 
     @Test
-    void valorBlankSeTrataComoNoEncontrado() {
+    void clavesQrNoObjetoSeIgnora() {
         String json = """
-                {"cabecera":{"numeroComprobante":{"valor":"  ","descripcion":null}},"detalle":[]}
+                {"cabecera":{"numeroComprobante":"1"},"detalle":[],"clavesQr":["nroCmp"]}
                 """;
-        ValorLlm v = parser.parsear(json, solicitud).cabecera().get("numeroComprobante");
-        assertThat(v.valor()).isNull();
-        assertThat(v.descripcion()).isEqualTo("Dato no encontrado.");
+        assertThat(numero(json).clavesQr()).isEmpty();
     }
 
     @Test

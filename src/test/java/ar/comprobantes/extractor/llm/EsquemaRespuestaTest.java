@@ -22,26 +22,50 @@ class EsquemaRespuestaTest {
         return new SolicitudExtraccion(List.of(campo("numeroComprobante"), campo("fechaEmision")), detalle);
     }
 
+    private static final String STRING_O_NULL = "{\"type\":[\"string\",\"null\"]}";
+
     @Test
     void esquemaTienePropiedadPorCampo() {
         ObjectNode e = esquema.para(solicitud(List.of(campo("descripcion"))), true);
         JsonNode cab = e.path("properties").path("cabecera");
-        assertThat(cab.path("properties").has("numeroComprobante")).isTrue();
-        assertThat(cab.path("properties").has("fechaEmision")).isTrue();
-        JsonNode req = cab.path("properties").path("numeroComprobante").path("required");
-        assertThat(req.toString()).contains("clavesQr", "valor", "descripcion");
-        assertThat(e.path("required").toString()).contains("cabecera", "detalle");
+        assertThat(cab.path("properties").path("numeroComprobante").toString()).isEqualTo(STRING_O_NULL);
+        assertThat(cab.path("properties").path("fechaEmision").toString()).isEqualTo(STRING_O_NULL);
+        assertThat(cab.path("required").toString()).contains("numeroComprobante", "fechaEmision");
         JsonNode det = e.path("properties").path("detalle");
         assertThat(det.path("type").asText()).isEqualTo("array");
-        assertThat(det.path("items").path("properties").has("descripcion")).isTrue();
+        assertThat(det.path("items").path("properties").path("descripcion").toString()).isEqualTo(STRING_O_NULL);
+        assertThat(det.path("items").path("required").toString()).contains("descripcion");
+    }
+
+    @Test
+    void clavesQrEsMapaOpcionalPorCampoDeCabecera() {
+        ObjectNode e = esquema.para(solicitud(List.of(campo("descripcion"))), true);
+        JsonNode cq = e.path("properties").path("clavesQr");
+        assertThat(cq.path("type").asText()).isEqualTo("object");
+        assertThat(cq.has("required")).isFalse();
+        assertThat(cq.path("properties").has("numeroComprobante")).isTrue();
+        assertThat(cq.path("properties").has("descripcion")).isFalse();
+        JsonNode items = cq.path("properties").path("numeroComprobante");
+        assertThat(items.path("type").asText()).isEqualTo("array");
+        List<String> en = new java.util.ArrayList<>();
+        items.path("items").path("enum").forEach(n -> en.add(n.asText()));
+        assertThat(en).containsExactlyElementsOf(ar.comprobantes.extractor.qr.DatosQrArca.CLAVES);
+    }
+
+    @Test
+    void conQrClavesQrEsObligatorioYVaAntesDelDetalle() {
+        ObjectNode e = esquema.para(solicitud(List.of(campo("descripcion"))), true);
+        assertThat(e.path("required").toString()).isEqualTo("[\"cabecera\",\"clavesQr\",\"detalle\"]");
+        List<String> orden = new java.util.ArrayList<>();
+        e.path("properties").fieldNames().forEachRemaining(orden::add);
+        assertThat(orden).containsExactly("cabecera", "clavesQr", "detalle");
     }
 
     @Test
     void esquemaSinQrNoTieneClavesQr() {
         ObjectNode e = esquema.para(solicitud(List.of()), false);
-        JsonNode c = e.path("properties").path("cabecera").path("properties").path("numeroComprobante");
-        assertThat(c.path("properties").has("clavesQr")).isFalse();
-        assertThat(c.path("required").toString()).doesNotContain("clavesQr");
+        assertThat(e.path("properties").has("clavesQr")).isFalse();
+        assertThat(e.path("required").toString()).isEqualTo("[\"cabecera\",\"detalle\"]");
     }
 
     @Test

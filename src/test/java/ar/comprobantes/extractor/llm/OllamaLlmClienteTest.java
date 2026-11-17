@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ar.comprobantes.extractor.config.ExtractorProperties;
+import ar.comprobantes.extractor.error.LlmLimiteTokensException;
 import ar.comprobantes.extractor.error.LlmNoDisponibleException;
 import ar.comprobantes.extractor.error.LlmTimeoutException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,7 +40,7 @@ class OllamaLlmClienteTest {
 
     private OllamaLlmCliente cliente(String url, Duration timeout, Boolean think) {
         var props = new ExtractorProperties(
-            new ExtractorProperties.Ollama(url, "qwen3-vl:4b", timeout, 8192, think),
+            new ExtractorProperties.Ollama(url, "qwen3-vl:4b", timeout, 8192, think, 2048),
             new ExtractorProperties.Concurrencia(1, Duration.ofSeconds(60)),
             new ExtractorProperties.Documento(10, 150, 200, 2000, 50),
             new ExtractorProperties.Debug(false));
@@ -66,6 +67,8 @@ class OllamaLlmClienteTest {
             .withRequestBody(matchingJsonPath("$.format.type", equalTo("object")))
             .withRequestBody(matchingJsonPath("$.options.temperature", equalTo("0")))
             .withRequestBody(matchingJsonPath("$.options.num_ctx", equalTo("8192")))
+            .withRequestBody(matchingJsonPath("$.options.num_predict", equalTo("2048")))
+            .withRequestBody(notMatching("(?s).*(repeat_penalty|presence_penalty).*"))
             .withRequestBody(matchingJsonPath("$.messages[0].role", equalTo("system")))
             .withRequestBody(matchingJsonPath("$.messages[1].images[0]", equalTo("AAAA")))
             .withRequestBody(notMatching("(?s).*\"think\".*")));
@@ -93,6 +96,35 @@ class OllamaLlmClienteTest {
         stubOk();
         String r = cliente(servidor.baseUrl(), Duration.ofSeconds(5), null).completar(prompt(List.of()));
         assertThat(r).isEqualTo("{\"cabecera\":{}}");
+    }
+
+    private static final String MSG_LIMITE =
+        "La respuesta del modelo superó el límite de tokens (EXTRACTOR_OLLAMA_NUMPREDICT).";
+
+    @Test
+    void limiteDeTokensEs422() {
+        servidor.stubFor(post("/api/chat").willReturn(okJson(
+            "{\"message\":{\"content\":\"{\\\"cabecera\\\":{\"},\"done_reason\":\"length\",\"eval_count\":2048}")));
+        var c = cliente(servidor.baseUrl(), Duration.ofSeconds(5), null);
+        assertThatThrownBy(() -> c.completar(prompt(List.of())))
+            .isInstanceOf(LlmLimiteTokensException.class).hasMessage(MSG_LIMITE);
+    }
+
+    @Test
+    void limiteDeTokensConJsonValidoIgualEs422() {
+        servidor.stubFor(post("/api/chat").willReturn(okJson(
+            "{\"message\":{\"content\":\"{}\"},\"done_reason\":\"length\",\"eval_count\":2048}")));
+        var c = cliente(servidor.baseUrl(), Duration.ofSeconds(5), null);
+        assertThatThrownBy(() -> c.completar(prompt(List.of())))
+            .isInstanceOf(LlmLimiteTokensException.class).hasMessage(MSG_LIMITE);
+    }
+
+    @Test
+    void doneReasonStopDevuelveContenido() {
+        servidor.stubFor(post("/api/chat").willReturn(okJson(
+            "{\"message\":{\"content\":\"{}\"},\"done_reason\":\"stop\",\"eval_count\":12}")));
+        String r = cliente(servidor.baseUrl(), Duration.ofSeconds(5), null).completar(prompt(List.of()));
+        assertThat(r).isEqualTo("{}");
     }
 
     @Test
@@ -140,7 +172,7 @@ class OllamaLlmClienteTest {
     @Test
     void timeoutDeConexionEs503() {
         var props = new ExtractorProperties(
-            new ExtractorProperties.Ollama("http://10.255.255.1:11434", "qwen3-vl:4b", Duration.ofSeconds(5), 8192, null),
+            new ExtractorProperties.Ollama("http://10.255.255.1:11434", "qwen3-vl:4b", Duration.ofSeconds(5), 8192, null, 2048),
             new ExtractorProperties.Concurrencia(1, Duration.ofSeconds(60)),
             new ExtractorProperties.Documento(10, 150, 200, 2000, 50),
             new ExtractorProperties.Debug(false));

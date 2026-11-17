@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ar.comprobantes.extractor.error.LlmLimiteTokensException;
 import ar.comprobantes.extractor.error.LlmNoDisponibleException;
 import ar.comprobantes.extractor.error.LlmTimeoutException;
 import ar.comprobantes.extractor.llm.LlmCliente;
@@ -32,7 +33,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class ExtraccionControllerTest {
 
     private static final String LLM_OK = """
-        {"cabecera":{"numeroComprobante":{"valor":"0003-00012345","descripcion":"Nro","clavesQr":[]}},"detalle":[]}
+        {"cabecera":{"numeroComprobante":"0003-00012345"},"detalle":[]}
         """;
     private static final String SOLICITUD_OK =
         "{\"camposCabecera\":[{\"nombre\":\"numeroComprobante\",\"etiquetas\":[\"Factura\"]}]}";
@@ -117,6 +118,15 @@ class ExtraccionControllerTest {
         mvc.perform(peticion(pdf(), SOLICITUD_OK))
             .andExpect(status().isServiceUnavailable())
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void limiteDeTokensEs422() throws Exception {
+        String msg = "La respuesta del modelo superó el límite de tokens (EXTRACTOR_OLLAMA_NUMPREDICT).";
+        when(llm.completar(any(PromptLlm.class))).thenThrow(new LlmLimiteTokensException(msg));
+        mvc.perform(peticion(pdf(), SOLICITUD_OK))
+            .andExpect(status().is(422))
+            .andExpect(jsonPath("$.detail").value(msg));
     }
 
     @Test

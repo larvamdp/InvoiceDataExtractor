@@ -1,6 +1,7 @@
 package ar.comprobantes.extractor.llm;
 
 import ar.comprobantes.extractor.config.ExtractorProperties;
+import ar.comprobantes.extractor.error.LlmLimiteTokensException;
 import ar.comprobantes.extractor.error.LlmNoDisponibleException;
 import ar.comprobantes.extractor.error.LlmTimeoutException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,6 +31,8 @@ public class OllamaLlmCliente implements LlmCliente {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
     private static final String MSG_NO_DISPONIBLE = "El servicio de IA no está disponible.";
     private static final String MSG_TIMEOUT = "El modelo excedió el tiempo máximo de respuesta.";
+    private static final String MSG_LIMITE_TOKENS =
+        "La respuesta del modelo superó el límite de tokens (EXTRACTOR_OLLAMA_NUMPREDICT).";
 
     private final ExtractorProperties.Ollama config;
     private final boolean logPrompts;
@@ -104,6 +107,11 @@ public class OllamaLlmCliente implements LlmCliente {
         if (logPrompts) {
             log.debug("ADVERTENCIA: extractor.debug.log-prompts activo. Respuesta: {}", contenido.asText());
         }
+        if ("length".equals(respuesta.path("done_reason").asText(""))) {
+            log.warn("El modelo alcanzó el límite de tokens: modelo={}, eval_count={}, num_predict={}",
+                config.modelo(), respuesta.path("eval_count").asText("n/d"), config.numPredict());
+            throw new LlmLimiteTokensException(MSG_LIMITE_TOKENS);
+        }
         return contenido.asText();
     }
 
@@ -112,7 +120,8 @@ public class OllamaLlmCliente implements LlmCliente {
         cuerpo.put("model", config.modelo());
         cuerpo.put("stream", false);
         cuerpo.set("format", prompt.esquema());
-        cuerpo.putObject("options").put("temperature", 0).put("num_ctx", config.numCtx());
+        cuerpo.putObject("options").put("temperature", 0).put("num_ctx", config.numCtx())
+            .put("num_predict", config.numPredict());
         if (config.think() != null) {
             cuerpo.put("think", config.think().booleanValue());
         }

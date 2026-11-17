@@ -54,8 +54,7 @@ class LogsSinContenidoTest {
     void logsNoContienenDatosDelDocumento(CapturedOutput salida) throws Exception {
         when(llm.modelo()).thenReturn("modelo-falso");
         when(llm.completar(any(PromptLlm.class))).thenReturn("""
-            {"cabecera":{"cliente":{"valor":"CLIENTE-SECRETO-XYZ","descripcion":null,"clavesQr":[]},
-                         "cuit":{"valor":"30-71234567-1","descripcion":null,"clavesQr":[]}},"detalle":[]}
+            {"cabecera":{"cliente":"CLIENTE-SECRETO-XYZ","cuit":"30-71234567-1"},"detalle":[]}
             """);
         mvc.perform(peticion()).andExpect(status().isOk());
         assertThat(salida.getAll()).contains("Extracción completada");

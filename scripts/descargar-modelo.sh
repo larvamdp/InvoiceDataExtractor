@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Descarga un modelo de Ollama al volumen `ollama-modelos`.
 # Es el UNICO paso que necesita acceso a internet; el servicio ollama corre luego en una red interna.
-# Uso: ./scripts/descargar-modelo.sh qwen3-vl:4b
+# Uso: ./scripts/descargar-modelo.sh qwen3-vl:4b-instruct
 set -euo pipefail
-MODELO="${1:?Uso: $0 <modelo>  (p. ej. qwen3-vl:4b)}"
+MODELO="${1:?Uso: $0 <modelo>  (p. ej. qwen3-vl:4b-instruct)}"
 docker volume create ollama-modelos >/dev/null
 # Contenedor temporal en la red bridge (con salida a internet); --rm lo elimina al terminar.
 docker run --rm -v ollama-modelos:/root/.ollama --network bridge --entrypoint sh ollama/ollama \

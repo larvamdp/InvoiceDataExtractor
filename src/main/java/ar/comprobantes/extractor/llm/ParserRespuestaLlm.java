@@ -7,6 +7,7 @@ import ar.comprobantes.extractor.qr.DatosQrArca;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.MissingNode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,36 +36,33 @@ public class ParserRespuestaLlm {
         if (raiz == null || !raiz.isObject()) {
             throw new RespuestaLlmInvalidaException("El modelo devolvió una respuesta con estructura inesperada.");
         }
-        Map<String, ValorLlm> cabecera = campos(raiz.path("cabecera"), solicitud.camposCabecera());
+        Map<String, ValorLlm> cabecera = campos(raiz.path("cabecera"), solicitud.camposCabecera(),
+            raiz.path("clavesQr"));
         List<Map<String, ValorLlm>> detalle = new ArrayList<>();
         JsonNode filas = raiz.path("detalle");
         if (filas.isArray() && !solicitud.camposDetalle().isEmpty()) {
             for (JsonNode fila : filas) {
-                detalle.add(campos(fila, solicitud.camposDetalle()));
+                detalle.add(campos(fila, solicitud.camposDetalle(), MissingNode.getInstance()));
             }
         }
         return new RespuestaLlm(cabecera, detalle);
     }
 
-    private Map<String, ValorLlm> campos(JsonNode nodo, List<CampoSolicitado> pedidos) {
+    private Map<String, ValorLlm> campos(JsonNode nodo, List<CampoSolicitado> pedidos, JsonNode clavesQr) {
         Map<String, ValorLlm> res = new LinkedHashMap<>();
         for (CampoSolicitado c : pedidos) {
-            res.put(c.nombre(), valor(nodo.path(c.nombre())));
+            res.put(c.nombre(), valor(nodo.path(c.nombre()), clavesQr.path(c.nombre())));
         }
         return res;
     }
 
-    private ValorLlm valor(JsonNode n) {
-        if (!n.isObject()) {
+    /** Valor directo (texto o número); vacío, "null", null u otro tipo cuentan como no encontrado. */
+    private ValorLlm valor(JsonNode n, JsonNode cq) {
+        String valor = n.isTextual() || n.isNumber() ? n.asText().trim() : null;
+        if (valor == null || valor.isEmpty() || valor.equalsIgnoreCase("null")) {
             return noEncontrado();
         }
-        String valor = texto(n.path("valor"));
-        if (valor == null || valor.isBlank()) {
-            return noEncontrado();
-        }
-        String descripcion = texto(n.path("descripcion"));
         List<String> claves = new ArrayList<>();
-        JsonNode cq = n.path("clavesQr");
         if (cq.isArray()) {
             for (JsonNode k : cq) {
                 if (k.isTextual() && DatosQrArca.CLAVES.contains(k.asText()) && !claves.contains(k.asText())) {
@@ -72,11 +70,7 @@ public class ParserRespuestaLlm {
                 }
             }
         }
-        return new ValorLlm(valor, descripcion, List.copyOf(claves));
-    }
-
-    private static String texto(JsonNode n) {
-        return n.isMissingNode() || n.isNull() ? null : n.asText();
+        return new ValorLlm(valor, null, List.copyOf(claves));
     }
 
     private static ValorLlm noEncontrado() {
