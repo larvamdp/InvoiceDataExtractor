@@ -27,6 +27,7 @@ class ExtractorPropertiesTest {
             assertThat(p.ollama().timeout()).isEqualTo(Duration.ofSeconds(90));
             assertThat(p.ollama().numCtx()).isEqualTo(8192);
             assertThat(p.ollama().think()).isNull();
+            assertThat(p.ollama().numPredict()).isEqualTo(2048);
             assertThat(p.concurrencia().maxLlm()).isEqualTo(1);
             assertThat(p.concurrencia().esperaMaxima()).isEqualTo(Duration.ofSeconds(60));
             assertThat(p.documento().maxPaginas()).isEqualTo(10);

@@ -15,6 +15,7 @@ import ar.comprobantes.extractor.conciliacion.VerificadorTextual;
 import ar.comprobantes.extractor.config.ExtractorProperties;
 import ar.comprobantes.extractor.documento.DetectorTipoDocumento;
 import ar.comprobantes.extractor.documento.ProcesadorDocumento;
+import ar.comprobantes.extractor.error.LlmLimiteTokensException;
 import ar.comprobantes.extractor.error.RespuestaLlmInvalidaException;
 import ar.comprobantes.extractor.llm.ConstructorPrompt;
 import ar.comprobantes.extractor.llm.EsquemaRespuesta;
@@ -191,6 +192,16 @@ class ExtraccionServiceTest {
         ResultadoExtraccion r = servicio(n -> n == 1 ? "no json" : JSON_OK).extraer(pdf(true), solicitud());
         assertThat(llamadas.get()).isEqualTo(2);
         assertThat(r.cabecera()).containsKey("importeTotal");
+    }
+
+    @Test
+    void noReintentaSiSeAlcanzaElLimite() throws Exception {
+        ExtraccionService s = servicio(n -> {
+            throw new LlmLimiteTokensException("límite");
+        });
+        byte[] pdf = pdf(true);
+        assertThatThrownBy(() -> s.extraer(pdf, solicitud())).isInstanceOf(LlmLimiteTokensException.class);
+        assertThat(llamadas.get()).isEqualTo(1);
     }
 
     @Test

@@ -16,7 +16,8 @@ public record ExtractorProperties(
         @DefaultValue("qwen3-vl:4b") String modelo,
         @DefaultValue("90s") Duration timeout,
         @DefaultValue("8192") int numCtx,
-        Boolean think) {
+        Boolean think,
+        @DefaultValue("2048") int numPredict) {
     }
 
     public record Concurrencia(

@@ -43,7 +43,7 @@ curl -sS --max-time 600 \
 
 `ejemplos/solicitud.json` define los campos de cabecera y de detalle (nombre, etiquetas, descripción, tipo `TEXTO | NUMERO | IMPORTE | FECHA | CUIT`). Cada campo vuelve con `valor`, `descripcion` y `fuente` (`QR_ARCA | DOCUMENTO | null`). Dato ausente: `valor: null` y `"Dato no encontrado."`.
 
-Errores en formato RFC 7807: 400 inválido, 413 tamaño/páginas, 415 formato, 422 JSON del LLM inválido, 503 ocupado u Ollama caído, 504 timeout del LLM.
+Errores en formato RFC 7807: 400 inválido, 413 tamaño/páginas, 415 formato, 422 JSON del LLM inválido o límite de tokens alcanzado, 503 ocupado u Ollama caído, 504 timeout del LLM.
 
 ### Tiempos (`metadatos.tiemposMs`)
 
@@ -67,6 +67,7 @@ Toda la configuración está bajo `extractor.*` y se puede sobreescribir con var
 | `EXTRACTOR_OLLAMA_MODELO` | `extractor.ollama.modelo` | `qwen3-vl:4b` | Modelo |
 | `EXTRACTOR_OLLAMA_TIMEOUT` | `extractor.ollama.timeout` | `90s` | Timeout de la llamada al LLM |
 | `EXTRACTOR_OLLAMA_NUMCTX` | `extractor.ollama.num-ctx` | `8192` | Contexto del modelo |
+| `EXTRACTOR_OLLAMA_NUMPREDICT` | `extractor.ollama.num-predict` | `2048` | Tope de tokens de salida del modelo; si se alcanza, 422 |
 | `EXTRACTOR_OLLAMA_THINK` | `extractor.ollama.think` | sin definir (compose: `false`) | Razonamiento del modelo |
 | `EXTRACTOR_CONCURRENCIA_MAXLLM` | `extractor.concurrencia.max-llm` | `1` | Llamadas simultáneas al LLM |
 | `EXTRACTOR_CONCURRENCIA_ESPERAMAXIMA` | `extractor.concurrencia.espera-maxima` | `60s` | Espera máxima en cola (luego 503) |
