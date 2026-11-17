@@ -23,7 +23,7 @@ class ExtractorPropertiesTest {
         runner.run(ctx -> {
             var p = ctx.getBean(ExtractorProperties.class);
             assertThat(p.ollama().url()).isEqualTo("http://localhost:11434");
-            assertThat(p.ollama().modelo()).isEqualTo("qwen3-vl:4b");
+            assertThat(p.ollama().modelo()).isEqualTo("qwen3-vl:4b-instruct");
             assertThat(p.ollama().timeout()).isEqualTo(Duration.ofSeconds(90));
             assertThat(p.ollama().numCtx()).isEqualTo(8192);
             assertThat(p.ollama().think()).isNull();

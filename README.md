@@ -8,14 +8,15 @@ Servicio REST (Spring Boot 3.5 / Java 21) que extrae campos de facturas argentin
 - Para GPU: NVIDIA Container Toolkit. Sin GPU funciona en CPU, más lento.
 - Sin GPU (solo CPU) el modelo es muy lento. En una notebook, un PDF de texto simple de 1 página tardó ~7 minutos (completó), pero la factura `retail-a` (8 líneas de detalle) superó 600 s y la API respondió 504. Con el timeout por defecto (`90s`) casi todo responde 504: subí `EXTRACTOR_OLLAMA_TIMEOUT` (p. ej. `900s`, en un archivo `.env` junto al compose, ver `.env.example`, o como variable de entorno) y usá en `curl` un `--max-time` mayor que ese timeout. Si además subís la concurrencia, subí también `EXTRACTOR_CONCURRENCIA_ESPERAMAXIMA` (la espera en cola cuenta aparte y vence con 503).
 - Ajustes de CPU: bajar `EXTRACTOR_DOCUMENTO_MAXLADOPX` (p. ej. `1200`) y el DPI (`EXTRACTOR_DOCUMENTO_DPIIMAGEN`) reduce los tokens de imagen; bajar `EXTRACTOR_OLLAMA_NUMCTX` acelera pero un contexto menor al prompt lo trunca (el log avisa con "posible truncamiento de contexto" cuando `prompt_eval_count` alcanza `num_ctx`).
-- Espacio en disco: el modelo por defecto (`qwen3-vl:4b`, licencia Apache 2.0) ocupa ~3.3 GB.
+- Espacio en disco: el modelo por defecto (`qwen3-vl:4b-instruct`, licencia Apache 2.0) ocupa ~3.3 GB.
+- Usar la variante **instruct**: el tag `qwen3-vl:4b` es la variante *thinking*, que razona siempre antes de responder (ignora `think: false`); ese razonamiento consume el tope `EXTRACTOR_OLLAMA_NUMPREDICT` y la API responde 422. Con un modelo que razone, `num_predict` cuenta también los tokens de razonamiento.
 
 ## Puesta en marcha
 
 1. Descargar el modelo (único paso con acceso a internet):
 
    ```bash
-   ./scripts/descargar-modelo.sh qwen3-vl:4b
+   ./scripts/descargar-modelo.sh qwen3-vl:4b-instruct
    ```
 
 2. Levantar los servicios:
@@ -64,7 +65,7 @@ Toda la configuración está bajo `extractor.*` y se puede sobreescribir con var
 | Variable | Propiedad | Default | Descripción |
 |---|---|---|---|
 | `EXTRACTOR_OLLAMA_URL` | `extractor.ollama.url` | `http://localhost:11434` (compose: `http://ollama:11434`) | URL de Ollama |
-| `EXTRACTOR_OLLAMA_MODELO` | `extractor.ollama.modelo` | `qwen3-vl:4b` | Modelo |
+| `EXTRACTOR_OLLAMA_MODELO` | `extractor.ollama.modelo` | `qwen3-vl:4b-instruct` | Modelo |
 | `EXTRACTOR_OLLAMA_TIMEOUT` | `extractor.ollama.timeout` | `90s` | Timeout de la llamada al LLM |
 | `EXTRACTOR_OLLAMA_NUMCTX` | `extractor.ollama.num-ctx` | `8192` | Contexto del modelo |
 | `EXTRACTOR_OLLAMA_NUMPREDICT` | `extractor.ollama.num-predict` | `2048` | Tope de tokens de salida del modelo; si se alcanza, 422 |
@@ -126,4 +127,4 @@ Entorno: notebook solo CPU (Intel Comet Lake-U, 8 hilos, sin GPU), modelo `qwen3
 | retail-a-escaneo | - | 504 | 600739 | n/d | n/d |
 | retail-a-foto | - | 504 | 600934 | n/d | n/d |
 
-Los tres documentos agotaron el timeout del LLM (600 s) y devolvieron 504, por lo que no hay métricas de precisión. Conclusión provisional: en esta notebook sin GPU, `qwen3-vl:4b` no cumple el objetivo de 60 s ni termina en 10 min con estos comprobantes (varias líneas de detalle). Falta medir el resto del dataset y concurrencia 2.
+Los tres documentos agotaron el timeout del LLM (600 s) y devolvieron 504, por lo que no hay métricas de precisión. Conclusión provisional: en esta notebook sin GPU, `qwen3-vl:4b` no cumple el objetivo de 60 s ni termina en 10 min con estos comprobantes (varias líneas de detalle). Falta medir el resto del dataset y concurrencia 2. **Nota (2026-11-17):** esa medición usó `qwen3-vl:4b`, que resultó ser la variante *thinking*; el tiempo se iba en razonamiento interno. Hay que repetirla con `qwen3-vl:4b-instruct`.
