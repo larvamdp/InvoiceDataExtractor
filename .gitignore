@@ -31,3 +31,6 @@ replay_pid*
 target/
 benchmark/reales/
 benchmark/resultados/
+
+# Configuración local (puede contener valores propios del entorno)
+.env
