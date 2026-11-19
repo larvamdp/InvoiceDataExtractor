@@ -137,4 +137,43 @@ class ConciliadorQrTest {
         assertThat(r.valor()).isEqualTo("2026-10-02");
         assertThat(r.fuente()).isEqualTo(Fuente.QR_ARCA);
     }
+
+    @Test void numeroCompuestoConSoloNroCmpConservaDocumento() {
+        ValorCampo r = conciliador.conciliar(campo("numeroComprobante", TipoCampo.TEXTO),
+            new ValorLlm("0003-00012345", null, List.of("nroCmp")), qr);
+        assertThat(r.valor()).isEqualTo("0003-00012345");
+        assertThat(r.fuente()).isEqualTo(Fuente.DOCUMENTO);
+        assertThat(r.descripcion()).isEqualTo("Verificado con QR de ARCA.");
+    }
+
+    @Test void numeroCompuestoConSoloPtoVtaConservaDocumento() {
+        ValorCampo r = conciliador.conciliar(campo("numeroComprobante", TipoCampo.TEXTO),
+            new ValorLlm("A 0003-00012345", null, List.of("ptoVta")), qr);
+        assertThat(r.valor()).isEqualTo("A 0003-00012345");
+        assertThat(r.fuente()).isEqualTo(Fuente.DOCUMENTO);
+        assertThat(r.descripcion()).isEqualTo("Verificado con QR de ARCA.");
+    }
+
+    @Test void numeroCompuestoConSoloNroCmpYPuntoDeVentaDistintoInforma() {
+        ValorCampo r = conciliador.conciliar(campo("numeroComprobante", TipoCampo.TEXTO),
+            new ValorLlm("0005-00012345", null, List.of("nroCmp")), qr);
+        assertThat(r.valor()).isEqualTo("0005-00012345");
+        assertThat(r.fuente()).isEqualTo(Fuente.DOCUMENTO);
+        assertThat(r.descripcion()).isEqualTo("No coincide con el QR de ARCA (ptoVta=3, nroCmp=12345); verificar.");
+    }
+
+    @Test void textoQueContieneElValorDelQrNoSeRecorta() {
+        ValorCampo r = conciliador.conciliar(campo("cae", TipoCampo.TEXTO),
+            new ValorLlm("CAE 70417054367476 vto 12/10/2026", null, List.of("codAut")), qr);
+        assertThat(r.valor()).isEqualTo("CAE 70417054367476 vto 12/10/2026");
+        assertThat(r.fuente()).isEqualTo(Fuente.DOCUMENTO);
+        assertThat(r.descripcion()).isEqualTo("Contiene el valor del QR de ARCA (codAut=70417054367476); verificar el resto.");
+    }
+
+    @Test void numeroSinPuntoDeVentaSigueUsandoQr() {
+        ValorCampo r = conciliador.conciliar(campo("numeroComprobante", TipoCampo.TEXTO),
+            new ValorLlm("12345", null, List.of("nroCmp")), qr);
+        assertThat(r.valor()).isEqualTo("12345");
+        assertThat(r.fuente()).isEqualTo(Fuente.QR_ARCA);
+    }
 }
