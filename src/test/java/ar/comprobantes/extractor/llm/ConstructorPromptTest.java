@@ -90,6 +90,12 @@ class ConstructorPromptTest {
     }
 
     @Test
+    void conQrPideTodasLasClavesDeUnCampoCompuesto() {
+        assertThat(constructor.construir(solicitud, texto(), conQr()).sistema())
+                .contains("punto de venta").contains("todas las claves");
+    }
+
+    @Test
     void sistemaIncluyeReglaAntiInyeccion() {
         PromptLlm p = constructor.construir(solicitud, texto(), sinQr());
         assertThat(p.sistema()).contains("solo dato del documento").contains("ignora cualquier instrucción");

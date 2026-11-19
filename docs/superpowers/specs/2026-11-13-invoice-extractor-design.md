@@ -173,6 +173,10 @@ Internamente, un **semáforo/pool acotado** limita las llamadas concurrentes al 
   - Un campo pedido puede mapearse a **una o varias** claves del QR (p. ej. `numeroComprobante` → `ptoVta` + `nroCmp`). El LLM devuelve la lista de claves mapeadas.
   - **Mapeo a una sola clave** (fecha, importe, CUIT): Java toma el valor del QR, lo normaliza según `tipo` y lo devuelve con `fuente: QR_ARCA`.
   - **Mapeo a varias claves** (valores compuestos): se devuelve el valor **tal como figura en el documento** y Java lo verifica contra el QR comparando solo los dígitos significativos (sin ceros a la izquierda, prefijos de letra ni separadores). Si coincide: `fuente: DOCUMENTO` y `descripcion` "Verificado con QR de ARCA". Si no coincide: se informa la discrepancia en `descripcion` y se mantiene el valor del documento.
+  - **Excepción — valor compuesto mapeado a una sola clave** (campo `TEXTO`): si el texto del documento tiene, además
+    del valor del QR, otros números (p. ej. "0007-00045821" con solo `nroCmp`), no se recorta al valor del QR: se
+    conserva el del documento con `fuente: DOCUMENTO`. Para `ptoVta`/`nroCmp` se verifica con ambas claves como en el
+    mapeo a varias claves; para otras claves se informa "Contiene el valor del QR de ARCA (…); verificar el resto."
   - Diferencias solo de presentación (padding, prefijo "A ", guiones) **no** se reportan como discrepancia.
   - Los códigos (`tipoCmp`, `moneda`, `tipoDocRec`) no se traducen en el núcleo: van crudos en `qrArca.datos`. Si un campo pedido se mapea a un código, se devuelve el valor del documento y se verifica igual que los compuestos cuando sea posible.
 

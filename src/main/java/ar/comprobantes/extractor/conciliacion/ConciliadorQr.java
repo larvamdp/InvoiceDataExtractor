@@ -37,6 +37,13 @@ public class ConciliadorQr {
     public ValorCampo conciliar(CampoSolicitado campo, ValorLlm llm, DatosQrArca qr) {
         ResultadoNormalizacion doc = normalizador.normalizar(llm.valor(), campo.tipo());
         List<String> claves = qr == null || llm.clavesQr() == null ? List.<String>of() : llm.clavesQr();
+        if (claves.size() == 1 && campo.tipo() == TipoCampo.TEXTO && doc.valor() != null
+                && qr.valorDeClave(claves.get(0)) != null && !DatosQrArca.CLAVES_CODIGO.contains(claves.get(0))) {
+            ValorCampo compuesto = conservarCompuesto(llm, doc.valor(), claves.get(0), qr);
+            if (compuesto != null) {
+                return compuesto;
+            }
+        }
         boolean todasPresentes = claves.stream().allMatch(c -> qr.valorDeClave(c) != null);
 
         if (claves.size() == 1 && todasPresentes && !DatosQrArca.CLAVES_CODIGO.contains(claves.get(0))) {
@@ -57,6 +64,40 @@ public class ConciliadorQr {
             descripcion = unir(descripcion, verificar(doc.valor(), claves, qr));
         }
         return new ValorCampo(doc.valor(), descripcion, doc.valor() == null ? null : Fuente.DOCUMENTO);
+    }
+
+    /**
+     * Si el texto del documento tiene, además del valor del QR, otros números (p. ej. "0007-00045821" frente a
+     * nroCmp=45821), no se recorta al valor del QR: se conserva el del documento y se verifica. El par
+     * punto de venta / número se completa con la clave complementaria. Devuelve null si no aplica.
+     */
+    private static ValorCampo conservarCompuesto(ValorLlm llm, Object valorDocumento, String clave, DatosQrArca qr) {
+        List<String> grupos = grupos(valorDocumento);
+        if (grupos.size() < 2 || !grupos.contains(sinCeros(texto(qr.valorDeClave(clave))))) {
+            return null;
+        }
+        String complementaria = switch (clave) {
+            case "nroCmp" -> "ptoVta";
+            case "ptoVta" -> "nroCmp";
+            default -> null;
+        };
+        String nota;
+        if (complementaria != null && qr.valorDeClave(complementaria) != null) {
+            nota = verificar(valorDocumento, List.of("ptoVta", "nroCmp"), qr);
+        } else {
+            nota = "Contiene el valor del QR de ARCA (" + clave + "=" + texto(qr.valorDeClave(clave))
+                + "); verificar el resto.";
+        }
+        return new ValorCampo(valorDocumento, unir(llm.descripcion(), nota), Fuente.DOCUMENTO);
+    }
+
+    private static List<String> grupos(Object valor) {
+        List<String> grupos = new ArrayList<>();
+        Matcher m = GRUPO_DIGITOS.matcher(texto(valor));
+        while (m.find()) {
+            grupos.add(sinCeros(m.group()));
+        }
+        return grupos;
     }
 
     private static Object normalizarQr(Object valor, TipoCampo tipo) {
@@ -94,11 +135,7 @@ public class ConciliadorQr {
         if (noCodigo.isEmpty()) {
             return null;
         }
-        List<String> delDocumento = new ArrayList<>();
-        Matcher m = GRUPO_DIGITOS.matcher(texto(valorDocumento));
-        while (m.find()) {
-            delDocumento.add(sinCeros(m.group()));
-        }
+        List<String> delDocumento = grupos(valorDocumento);
         List<String> delQr = noCodigo.stream().map(c -> sinCeros(texto(qr.valorDeClave(c)))).toList();
         if (ordenada(delDocumento).equals(ordenada(delQr))) {
             return "Verificado con QR de ARCA.";

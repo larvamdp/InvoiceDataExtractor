@@ -35,7 +35,9 @@ public class ConstructorPrompt {
 
     private static final String SISTEMA_QR = """
             - Hay datos verificados del QR de ARCA. En "clavesQr" indica, solo para los campos de cabecera que \
-            correspondan, qué claves del QR les corresponden; omite los demás.
+            correspondan, qué claves del QR les corresponden; omite los demás. Si un campo combina varios datos \
+            (p. ej. un número de comprobante con punto de venta y número), indica todas las claves que lo componen \
+            (p. ej. ["ptoVta","nroCmp"]).
             """;
 
     private final EsquemaRespuesta esquema;
