@@ -42,9 +42,12 @@ EXTRACTOR_VERTEX_PROYECTO=mi-proyecto
 EXTRACTOR_VERTEX_REGION=us-central1
 EXTRACTOR_VERTEX_MODELO=gemini-2.5-flash
 EXTRACTOR_VERTEX_CREDENCIALES=/run/secretos/vertex.json
+EXTRACTOR_VERTEX_PRESUPUESTORAZONAMIENTO=0
 ```
 
-Cuenta de servicio: en Google Cloud, IAM y administración, Cuentas de servicio, crear una y darle el rol `Vertex AI User` en el proyecto; crear una clave JSON y guardarla en `secretos/vertex.json` (la carpeta `secretos/` se monta en solo lectura en `/run/secretos` y no se versiona). Opcionales: `EXTRACTOR_VERTEX_TIMEOUT` (`90s`), `EXTRACTOR_VERTEX_MAXTOKENS` (`4096`).
+`EXTRACTOR_VERTEX_PRESUPUESTORAZONAMIENTO=0` desactiva el razonamiento de Gemini. Algunos modelos exigen un mínimo (p. ej. 2.5 Pro >= 128); sin definirlo el modelo razona de forma dinámica (más latencia y costo, y esos tokens cuentan contra `EXTRACTOR_VERTEX_MAXTOKENS`).
+
+Cuenta de servicio: en Google Cloud, IAM y administración, Cuentas de servicio, crear una y darle el rol `Vertex AI User` en el proyecto; crear una clave JSON y guardarla en `secretos/vertex.json` (la carpeta `secretos/` se monta en solo lectura en `/run/secretos` y no se versiona). El archivo debe ser legible por el usuario no root del contenedor (p. ej. `chmod 644 secretos/vertex.json`). Opcionales: `EXTRACTOR_VERTEX_TIMEOUT` (`90s`), `EXTRACTOR_VERTEX_MAXTOKENS` (`4096`).
 
 - Razonamiento de Gemini: `EXTRACTOR_VERTEX_PRESUPUESTORAZONAMIENTO` fija el `thinkingBudget` (p. ej. `0` en 2.5 Flash; algunos modelos exigen un mínimo). Sin definir no se envía.
 - Advertencia: con `EXTRACTOR_VERTEX_REGION=global` el servicio registra un aviso y no se garantiza dónde procesa Google los datos. Para residencia de datos usar una región concreta.
@@ -52,6 +55,10 @@ Cuenta de servicio: en Google Cloud, IAM y administración, Cuentas de servicio,
 **Proxy y CA**: `EXTRACTOR_PROXY_HOST`, `EXTRACTOR_PROXY_PUERTO` y, si el proxy lo pide, `EXTRACTOR_PROXY_USUARIO` y `EXTRACTOR_PROXY_CLAVE`. Aplica solo a Azure y Vertex (incluido el pedido del token de Google); sin `EXTRACTOR_PROXY_HOST` no se usa proxy. El servicio habilita al arrancar la autenticación Basic para túneles HTTPS (un `-Djdk.http.auth.tunneling.disabledSchemes` explícito tiene prioridad). Si el proxy inspecciona TLS, guardar la CA corporativa en PEM en `secretos/ca-proxy.pem` y definir `EXTRACTOR_PROXY_CAEXTRA=/run/secretos/ca-proxy.pem`; se suma a las CA del JDK. El pedido del token de Google usa los timeouts por defecto de la librería (~20 s de conexión y ~20 s de lectura) y no reintenta.
 
 `EXTRACTOR_CONCURRENCIA_MAXLLM` sin definir es `1` con Ollama y `4` con proveedores en la nube.
+
+## Actualizar una instalación existente
+
+Si ya usabas Ollama y tu `.env` no tiene `COMPOSE_PROFILES`, agregar `COMPOSE_PROFILES=ollama`: sin esa línea `docker compose up` ya no levanta el contenedor `ollama` y la API responde 503.
 
 ## Puesta en marcha
 
