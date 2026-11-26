@@ -117,4 +117,33 @@ class EsquemaAzureTest {
             }
         }
     }
+
+    private void todoNodoTieneTipo(JsonNode n, String ruta) {
+        if (n.isObject()) {
+            if (n.has("enum")) {
+                assertThat(n.has("type")).as("enum sin type en " + ruta).isTrue();
+            }
+            n.fields().forEachRemaining(e -> todoNodoTieneTipo(e.getValue(), ruta + "/" + e.getKey()));
+        } else if (n.isArray()) {
+            n.forEach(x -> todoNodoTieneTipo(x, ruta));
+        }
+    }
+
+    @Test
+    void itemsConEnumLlevanTipoString() {
+        ObjectNode e = EsquemaAzure.adaptar(canonico(List.of(campo("descripcion")), true));
+        todoNodoTieneTipo(e, "");
+        assertThat(e.path("properties").path("clavesQr").path("properties").path("numeroComprobante")
+            .path("items").path("type").asText()).isEqualTo("string");
+    }
+
+    @Test
+    void soloDetalleQuitaCabeceraYClavesQrVacias() {
+        List<CampoSolicitado> det = List.of(campo("descripcion"));
+        for (boolean hayQr : new boolean[] {true, false}) {
+            ObjectNode e = EsquemaAzure.adaptar(fuente.para(new SolicitudExtraccion(List.of(), det), hayQr));
+            assertThat(claves(e.path("properties"))).containsExactly("detalle");
+            assertThat(textos(e.path("required"))).containsExactly("detalle");
+        }
+    }
 }
