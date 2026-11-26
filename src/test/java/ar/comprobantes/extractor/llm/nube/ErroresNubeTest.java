@@ -151,14 +151,21 @@ class ErroresNubeTest {
     @Test
     void autenticacionRechazadaPorElJdk(CapturedOutput out) {
         for (String m : new String[] {"too many authentication attempts. Limit: 3",
-            "No credentials provided SECRETO", "WWW-Authenticate header missing for response code 401"}) {
+            "No credentials provided SECRETO", "WWW-Authenticate header missing for response code 401",
+            "Unable to tunnel through proxy. Proxy returns \"HTTP/1.1 407 Proxy Authentication Required\""}) {
             ResourceAccessException e = new ResourceAccessException("x", new java.io.IOException(m));
             assertThat(ErroresNube.traducir(e, "azure", "gpt", PROXY)).isInstanceOf(LlmNoDisponibleException.class)
                 .hasMessage(MSG);
         }
         assertThat(out.getAll()).contains("autenticación rechazada por el proxy o el proveedor: proveedor=azure")
             .doesNotContain("too many authentication attempts").doesNotContain("No credentials provided")
-            .doesNotContain("header missing").doesNotContain("SECRETO").doesNotContain("no se pudo conectar");
+            .doesNotContain("header missing").doesNotContain("Unable to tunnel").doesNotContain("SECRETO").doesNotContain("no se pudo conectar");
+    }
+
+    @Test
+    void tunelRechazadoPorOtroMotivoNoEsAutenticacion() {
+        assertThat(ErroresNube.esFalloDeAutenticacion(new java.io.IOException(
+            "Unable to tunnel through proxy. Proxy returns \"HTTP/1.1 403 Forbidden\""))).isFalse();
     }
 
     @Test

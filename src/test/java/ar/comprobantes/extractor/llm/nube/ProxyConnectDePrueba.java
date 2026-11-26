@@ -12,6 +12,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 /** Proxy CONNECT mínimo: 407 sin Proxy-Authorization esperado; con él, abre el túnel hacia localhost:destino. */
 public final class ProxyConnectDePrueba implements AutoCloseable {
     public final AtomicInteger connectAutenticados = new AtomicInteger();
+    /** CONNECT que traían algún Proxy-Authorization, correcto o no. */
+    public final AtomicInteger connectConCredenciales = new AtomicInteger();
     private final ServerSocket socket;
     private final String esperado;
     private final int destino;
@@ -53,6 +55,9 @@ public final class ProxyConnectDePrueba implements AutoCloseable {
                 }
                 if (!cabecera.startsWith("CONNECT ")) {
                     return;
+                }
+                if (cabecera.toLowerCase().contains("proxy-authorization:")) {
+                    connectConCredenciales.incrementAndGet();
                 }
                 if (!cabecera.toLowerCase().contains(("Proxy-Authorization: " + esperado).toLowerCase())) {
                     out.write(("HTTP/1.1 407 Proxy Authentication Required\r\n"

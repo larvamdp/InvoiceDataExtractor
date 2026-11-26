@@ -127,7 +127,8 @@ public final class ErroresNube {
         for (Throwable c = t; c != null; c = c.getCause()) {
             String m = c instanceof java.io.IOException ? c.getMessage() : null;
             if (m != null && (m.contains("too many authentication attempts") || m.contains("No credentials provided")
-                || m.contains("header missing"))) {
+                || m.contains("header missing")
+                || (m.startsWith("Unable to tunnel through proxy") && m.contains(" 407 ")))) {
                 return true;
             }
         }

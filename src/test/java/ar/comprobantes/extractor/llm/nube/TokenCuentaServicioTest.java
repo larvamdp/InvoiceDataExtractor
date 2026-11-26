@@ -133,6 +133,19 @@ class TokenCuentaServicioTest {
     }
 
     @Test
+    void proxyQueRechazaLaClaveRecibeUnSoloIntentoYElLogLoDice(CapturedOutput out) throws Exception {
+        try (ProxyConnectDePrueba tunel = new ProxyConnectDePrueba("Basic dTpj", 9)) {
+            Path json = CuentaServicioDePrueba.escribir(dir, "https://localhost:9/token");
+            TokenCuentaServicio t = new TokenCuentaServicio(json,
+                new ExtractorProperties.Proxy("localhost", tunel.puerto(), "u", "mal", null));
+            assertThatThrownBy(t::token).isInstanceOf(LlmNoDisponibleException.class);
+            // Cada intento fallido cuenta para el bloqueo de la cuenta en el proxy corporativo.
+            assertThat(tunel.connectConCredenciales.get()).isEqualTo(1);
+            assertThat(out.getAll()).contains("autenticación rechazada por el proxy").doesNotContain("mal");
+        }
+    }
+
+    @Test
     void archivoInexistenteFallaAlCrear() {
         assertThatThrownBy(() -> new TokenCuentaServicio(dir.resolve("no-existe.json"), null))
             .isInstanceOf(IllegalStateException.class)

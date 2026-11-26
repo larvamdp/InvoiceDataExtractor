@@ -106,6 +106,20 @@ class HttpNubeTest {
     }
 
     @Test
+    void proxyQueRechazaLaClaveNoRecibeRafagaDeReintentos() throws Exception {
+        try (ProxyConnectDePrueba proxyConnect = new ProxyConnectDePrueba("Basic dTpj", servidor.httpsPort())) {
+            var props = new ExtractorProperties.Proxy("localhost", proxyConnect.puerto(), "u", "mal",
+                recurso("/tls/ca-prueba.pem"));
+            var cliente = HttpNube.restClient("https://localhost:" + servidor.httpsPort(), Duration.ofSeconds(10),
+                props);
+            assertThatThrownBy(() -> cliente.get().uri("/v1/x").retrieve().body(String.class))
+                .isInstanceOf(RestClientException.class);
+            // Cada intento fallido cuenta para el bloqueo de la cuenta en el proxy corporativo.
+            assertThat(proxyConnect.connectConCredenciales.get()).isBetween(1, 2);
+        }
+    }
+
+    @Test
     void httpsSinCaExtraFalla() throws Exception {
         servidor.stubFor(get(urlEqualTo("/v1/x")).willReturn(ok("seguro")));
         try (ProxyConnectDePrueba proxyConnect = new ProxyConnectDePrueba("Basic dTpj", servidor.httpsPort())) {

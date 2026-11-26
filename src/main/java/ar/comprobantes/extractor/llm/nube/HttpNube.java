@@ -28,7 +28,7 @@ public final class HttpNube {
         if (proxy != null && proxy.activo()) {
             builder.proxy(ProxySelector.of(new InetSocketAddress(proxy.host(), proxy.puerto())));
             if (proxy.usuario() != null && !proxy.usuario().isBlank()) {
-                // Basic ante proxy/túnel lo habilita ExtractorApplication.habilitarBasicEnProxy() al arrancar:
+                // Basic ante proxy/túnel lo habilita ExtractorApplication.configurarAutenticacionDeProxy() al arrancar:
                 // el JDK lee esas propiedades una sola vez, al construir el primer HttpClient.
                 builder.authenticator(autenticadorDeProxy(proxy));
             }

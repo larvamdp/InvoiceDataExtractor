@@ -80,7 +80,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <argLine>-Djdk.http.auth.tunneling.disabledSchemes= -Djdk.http.auth.proxying.disabledSchemes=</argLine>
+          <argLine>-Djdk.http.auth.tunneling.disabledSchemes= -Djdk.http.auth.proxying.disabledSchemes= -Djdk.httpclient.auth.retrylimit=0 -Dhttp.maxRedirects=2</argLine>
         </configuration>
       </plugin>
       <plugin>
