@@ -8,6 +8,9 @@
 const NOMBRE_VALIDO = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const TIPOS = ["TEXTO", "NUMERO", "IMPORTE", "FECHA", "CUIT"];
 const ENDPOINT = "/api/v1/extracciones/sync";
+// Igual que spring.servlet.multipart.max-file-size: por encima, Tomcat corta la conexión y el navegador
+// vería un error de red en lugar del 413.
+const TAMANO_MAXIMO = 10 * 1024 * 1024;
 
 const CATALOGO = {
   cabecera: [
@@ -105,9 +108,16 @@ function marcarSeccion(seccion, valor) {
 
 function elegirArchivo(archivo) {
   if (!archivo) return;
-  estado.archivo = archivo;
-  $("zona-texto").textContent = archivo.name + " (" + Math.max(1, Math.round(archivo.size / 1024)) + " KB)";
-  $("zona-documento").classList.add("con-archivo");
+  const kb = Math.max(1, Math.round(archivo.size / 1024)) + " KB";
+  if (archivo.size > TAMANO_MAXIMO) {
+    estado.archivo = null;
+    $("zona-texto").textContent = archivo.name + " (" + kb + "): el documento supera 10 MB. Elegí otro.";
+    $("zona-documento").classList.remove("con-archivo");
+  } else {
+    estado.archivo = archivo;
+    $("zona-texto").textContent = archivo.name + " (" + kb + ")";
+    $("zona-documento").classList.add("con-archivo");
+  }
   actualizarBotones();
 }
 
@@ -368,6 +378,10 @@ function iniciar() {
     zona.classList.remove("arrastrando");
     elegirArchivo(e.dataTransfer.files[0]);
   });
+
+  // Un archivo soltado fuera de la zona haría que el navegador lo abra y se pierda la sesión.
+  document.addEventListener("dragover", (e) => e.preventDefault());
+  document.addEventListener("drop", (e) => e.preventDefault());
 
   for (const boton of document.querySelectorAll("[data-marcar]")) {
     boton.addEventListener("click", () => marcarSeccion(boton.dataset.marcar, boton.dataset.valor === "true"));
