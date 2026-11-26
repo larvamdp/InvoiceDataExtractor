@@ -82,7 +82,8 @@ class ErroresNubeTest {
             ExtraccionException r = traducir(http(status, new HttpHeaders(), ""));
             assertThat(r).isInstanceOf(LlmNoDisponibleException.class).hasMessage(MSG);
         }
-        assertThat(out.getAll()).contains("credenciales rechazadas por el proveedor: proveedor=azure status=401");
+        assertThat(out.getAll()).contains("credenciales rechazadas por el proveedor: proveedor=azure status=401")
+            .contains("credenciales rechazadas por el proveedor: proveedor=azure status=403");
     }
 
     @Test
@@ -143,6 +144,19 @@ class ErroresNubeTest {
         assertThat(out.getAll()).contains("no se pudo conectar con el proveedor").doesNotContain("SECRETO");
         assertThat(ErroresNube.traducir(e, "azure", "gpt", true)).isInstanceOf(LlmNoDisponibleException.class);
         assertThat(out.getAll()).contains("no se pudo conectar (vía proxy)");
+    }
+
+    @Test
+    void autenticacionRechazadaPorElJdk(CapturedOutput out) {
+        for (String m : new String[] {"too many authentication attempts. Limit: 3",
+            "No credentials provided SECRETO", "WWW-Authenticate header missing for response code 401"}) {
+            ResourceAccessException e = new ResourceAccessException("x", new java.io.IOException(m));
+            assertThat(ErroresNube.traducir(e, "azure", "gpt", true)).isInstanceOf(LlmNoDisponibleException.class)
+                .hasMessage(MSG);
+        }
+        assertThat(out.getAll()).contains("autenticación rechazada por el proxy o el proveedor: proveedor=azure")
+            .doesNotContain("too many authentication attempts").doesNotContain("No credentials provided")
+            .doesNotContain("header missing").doesNotContain("SECRETO").doesNotContain("no se pudo conectar");
     }
 
     @Test

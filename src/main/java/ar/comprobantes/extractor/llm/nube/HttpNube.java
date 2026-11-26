@@ -28,9 +28,8 @@ public final class HttpNube {
         if (proxy != null && proxy.activo()) {
             builder.proxy(ProxySelector.of(new InetSocketAddress(proxy.host(), proxy.puerto())));
             if (proxy.usuario() != null && !proxy.usuario().isBlank()) {
-                // El JDK deshabilita Basic en túneles CONNECT por defecto.
-                System.setProperty("jdk.http.auth.tunneling.disabledSchemes", "");
-                System.setProperty("jdk.http.auth.proxying.disabledSchemes", "");
+                // Basic ante proxy/túnel lo habilita ExtractorApplication.habilitarBasicEnProxy() al arrancar:
+                // el JDK lee esas propiedades una sola vez, al construir el primer HttpClient.
                 String clave = proxy.clave() == null ? "" : proxy.clave();
                 builder.authenticator(new Authenticator() {
                     @Override

@@ -41,6 +41,12 @@ public final class ErroresNube {
                 log.warn("timeout esperando al proveedor: proveedor={} modelo={}", proveedor, modelo);
                 return new LlmTimeoutException(MSG_TIMEOUT);
             }
+            if (esFalloDeAutenticacion(e)) {
+                // Con Authenticator el JDK convierte 401/407 en IOException; el mensaje solo elige el log, no se registra.
+                log.warn("autenticación rechazada por el proxy o el proveedor: proveedor={} modelo={}",
+                    proveedor, modelo);
+                return new LlmNoDisponibleException(MSG_NO_DISPONIBLE);
+            }
             log.warn(hayProxy ? "no se pudo conectar (vía proxy): proveedor={} modelo={}"
                 : "no se pudo conectar con el proveedor: proveedor={} modelo={}", proveedor, modelo);
             return new LlmNoDisponibleException(MSG_NO_DISPONIBLE);
@@ -105,6 +111,17 @@ public final class ErroresNube {
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    private static boolean esFalloDeAutenticacion(Throwable t) {
+        for (Throwable c = t; c != null; c = c.getCause()) {
+            String m = c instanceof java.io.IOException ? c.getMessage() : null;
+            if (m != null && (m.contains("too many authentication attempts") || m.contains("No credentials provided")
+                || m.contains("header missing"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean esTimeout(Throwable t) {

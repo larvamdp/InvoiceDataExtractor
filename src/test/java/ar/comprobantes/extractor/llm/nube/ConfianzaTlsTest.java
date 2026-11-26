@@ -15,7 +15,15 @@ import org.junit.jupiter.api.io.TempDir;
 
 class ConfianzaTlsTest {
 
-    private static final Path CA = Path.of("src/test/resources/tls/ca-prueba.pem");
+    private static final Path CA = pemDePrueba();
+
+    private static Path pemDePrueba() {
+        try {
+            return Path.of(ConfianzaTlsTest.class.getResource("/tls/ca-prueba.pem").toURI());
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
 
     @Test
     void agregaCaDelPem() throws Exception {
