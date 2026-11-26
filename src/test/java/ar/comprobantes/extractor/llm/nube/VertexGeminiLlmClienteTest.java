@@ -23,6 +23,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
@@ -142,11 +144,27 @@ class VertexGeminiLlmClienteTest {
             .isInstanceOf(RespuestaLlmInvalidaException.class).hasMessage(MSG_INVALIDA);
     }
 
-    @Test
-    void safetyEs422() {
-        stubRespuesta("{\"candidates\":[{\"finishReason\":\"SAFETY\"}]}");
+    @ParameterizedTest
+    @ValueSource(strings = {"SAFETY", "RECITATION", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII"})
+    void finBloqueadoEs422(String fin) {
+        stubRespuesta("{\"candidates\":[{\"finishReason\":\"" + fin + "\"}]}");
         assertThatThrownBy(() -> cliente().completar(prompt(List.of())))
             .isInstanceOf(RespuestaLlmInvalidaException.class).hasMessage(MSG_INVALIDA);
+    }
+
+    @Test
+    void regionGlobalEnLaRuta() {
+        var vertex = new ExtractorProperties.Vertex("mi-proyecto", "global", "gemini-2.5-flash", null,
+            Duration.ofSeconds(5), 4096, null);
+        var props = new ExtractorProperties(null, null, null, vertex, null,
+            new ExtractorProperties.Concurrencia(1, Duration.ofSeconds(60)),
+            new ExtractorProperties.Documento(10, 150, 200, 2000, 50),
+            new ExtractorProperties.Debug(false));
+        servidor.stubFor(post(urlPathMatching(".*")).willReturn(okJson(
+            "{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":[{\"text\":\"{}\"}]}}]}")));
+        new VertexGeminiLlmCliente(props, () -> "tok-1", servidor.baseUrl()).completar(prompt(List.of()));
+        servidor.verify(postRequestedFor(urlEqualTo("/v1/projects/mi-proyecto/locations/global/publishers/google/"
+            + "models/gemini-2.5-flash:generateContent")));
     }
 
     @Test

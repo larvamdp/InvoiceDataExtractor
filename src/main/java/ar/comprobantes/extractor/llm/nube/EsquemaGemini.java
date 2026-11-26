@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /** Adapta el esquema canónico al subconjunto OpenAPI de {@code responseSchema} de Gemini. */
@@ -18,14 +20,15 @@ public final class EsquemaGemini {
     public static ObjectNode adaptar(ObjectNode canonico) {
         ObjectNode copia = canonico.deepCopy();
         if (copia.path("properties") instanceof ObjectNode props) {
-            JsonNode detalle = props.path("detalle");
-            if (detalle.path("maxItems").isNumber() && detalle.path("maxItems").asInt() == 0) {
-                // Sin campos de detalle el parser ignora la propiedad: se quita en vez de pedirla vacía.
-                props.remove("detalle");
-                if (copia.path("required") instanceof ArrayNode req) {
-                    for (int i = req.size() - 1; i >= 0; i--) {
-                        if ("detalle".equals(req.get(i).asText())) {
-                            req.remove(i);
+            // Gemini rechaza OBJECT sin propiedades y el parser tolera la ausencia: se quitan los bloques vacíos.
+            for (String nombre : List.copyOf(claves(props))) {
+                if (vacio(props.path(nombre))) {
+                    props.remove(nombre);
+                    if (copia.path("required") instanceof ArrayNode req) {
+                        for (int i = req.size() - 1; i >= 0; i--) {
+                            if (nombre.equals(req.get(i).asText())) {
+                                req.remove(i);
+                            }
                         }
                     }
                 }
@@ -33,6 +36,20 @@ public final class EsquemaGemini {
         }
         convertir(copia);
         return copia;
+    }
+
+    private static List<String> claves(ObjectNode obj) {
+        List<String> r = new ArrayList<>();
+        obj.fieldNames().forEachRemaining(r::add);
+        return r;
+    }
+
+    /** Detalle sin campos (maxItems 0) u objeto sin propiedades. */
+    private static boolean vacio(JsonNode n) {
+        if (n.path("maxItems").isNumber() && n.path("maxItems").asInt() == 0) {
+            return true;
+        }
+        return n.path("properties") instanceof ObjectNode p && p.isEmpty();
     }
 
     /** Recorre por estructura de esquema (no por claves): los nombres de campo pueden coincidir con palabras clave. */

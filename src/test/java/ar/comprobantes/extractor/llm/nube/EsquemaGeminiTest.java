@@ -124,4 +124,27 @@ class EsquemaGeminiTest {
             }
         }
     }
+
+    private void sinObjetosVacios(JsonNode n) {
+        if (n.isObject()) {
+            if (n.has("properties")) {
+                assertThat(n.path("properties").size()).isPositive();
+            }
+            n.forEach(this::sinObjetosVacios);
+        } else if (n.isArray()) {
+            n.forEach(this::sinObjetosVacios);
+        }
+    }
+
+    @Test
+    void soloDetalleNoDejaObjetosVacios() {
+        for (boolean hayQr : new boolean[] {true, false}) {
+            ObjectNode e = EsquemaGemini.adaptar(
+                fuente.para(new SolicitudExtraccion(List.of(), List.of(campo("descripcion"))), hayQr));
+            sinObjetosVacios(e);
+            assertThat(claves(e.path("properties"))).containsExactly("detalle");
+            assertThat(textos(e.path("required"))).containsExactly("detalle");
+            assertThat(textos(e.path("propertyOrdering"))).containsExactly("detalle");
+        }
+    }
 }
