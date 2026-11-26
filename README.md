@@ -5,6 +5,10 @@ Servicio REST (Spring Boot 3.5 / Java 21) que extrae campos de facturas argentin
 ## Requisitos
 
 - Docker con Compose v2.20 o posterior (`docker compose`).
+- Con Azure OpenAI o Vertex AI: la cuenta del proveedor (ver [Elegir proveedor de IA](#elegir-proveedor-de-ia)) y salida a internet, directa o por proxy. No hace falta GPU ni descargar modelos.
+
+### Con Ollama (modelo local)
+
 - Para GPU: NVIDIA Container Toolkit. Sin GPU funciona en CPU, más lento.
 - Sin GPU (solo CPU) el modelo es muy lento. En una notebook, un PDF de texto simple de 1 página tardó ~7 minutos (completó), pero la factura `retail-a` (8 líneas de detalle) superó 600 s y la API respondió 504. Con el timeout por defecto (`90s`) casi todo responde 504: subí `EXTRACTOR_OLLAMA_TIMEOUT` (p. ej. `900s`, en un archivo `.env` junto al compose, ver `.env.example`, o como variable de entorno) y usá en `curl` un `--max-time` mayor que ese timeout. Si además subís la concurrencia, subí también `EXTRACTOR_CONCURRENCIA_ESPERAMAXIMA` (la espera en cola cuenta aparte y vence con 503).
 - Ajustes de CPU: bajar `EXTRACTOR_DOCUMENTO_MAXLADOPX` (p. ej. `1200`) y el DPI (`EXTRACTOR_DOCUMENTO_DPIIMAGEN`) reduce los tokens de imagen; bajar `EXTRACTOR_OLLAMA_NUMCTX` acelera pero un contexto menor al prompt lo trunca (el log avisa con "posible truncamiento de contexto" cuando `prompt_eval_count` alcanza `num_ctx`).
@@ -13,7 +17,7 @@ Servicio REST (Spring Boot 3.5 / Java 21) que extrae campos de facturas argentin
 
 ## Elegir proveedor de IA
 
-`EXTRACTOR_LLM_PROVEEDOR` elige el proveedor: `OLLAMA` (default), `AZURE_OPENAI` o `VERTEX_GEMINI`. Se configura en `.env` (ver `.env.example`). Si falta una variable obligatoria el servicio no arranca y el log nombra las que faltan. Los tres usan temperatura 0 y no hay reintentos ante 429 ni fallback entre proveedores.
+`EXTRACTOR_LLM_PROVEEDOR` elige el proveedor: `OLLAMA` (default), `AZURE_OPENAI` o `VERTEX_GEMINI`. Se configura en `.env` (ver `.env.example`). Si falta una variable obligatoria el servicio no arranca y el log nombra las que faltan. Se usa temperatura 0 (salvo modelos de razonamiento de Azure, ver abajo) y no hay reintentos ante 429 ni fallback entre proveedores.
 
 **Ollama** (local): `COMPOSE_PROFILES=ollama` levanta el contenedor `ollama`; sin ese perfil no se levanta. Es el único caso que lo necesita.
 
@@ -45,12 +49,11 @@ EXTRACTOR_VERTEX_CREDENCIALES=/run/secretos/vertex.json
 EXTRACTOR_VERTEX_PRESUPUESTORAZONAMIENTO=0
 ```
 
-`EXTRACTOR_VERTEX_PRESUPUESTORAZONAMIENTO=0` desactiva el razonamiento de Gemini. Algunos modelos exigen un mínimo (p. ej. 2.5 Pro >= 128); sin definirlo el modelo razona de forma dinámica (más latencia y costo, y esos tokens cuentan contra `EXTRACTOR_VERTEX_MAXTOKENS`).
+`EXTRACTOR_VERTEX_PRESUPUESTORAZONAMIENTO` fija el `thinkingBudget` de Gemini: `0` lo desactiva (2.5 Flash); algunos modelos exigen un mínimo (p. ej. 2.5 Pro >= 128). Sin definirlo no se envía y el modelo razona de forma dinámica (más latencia y costo, y esos tokens cuentan contra `EXTRACTOR_VERTEX_MAXTOKENS`).
 
 Cuenta de servicio: en Google Cloud, IAM y administración, Cuentas de servicio, crear una y darle el rol `Vertex AI User` en el proyecto; crear una clave JSON y guardarla en `secretos/vertex.json` (la carpeta `secretos/` se monta en solo lectura en `/run/secretos` y no se versiona). El archivo debe ser legible por el usuario no root del contenedor (p. ej. `chmod 644 secretos/vertex.json`). Opcionales: `EXTRACTOR_VERTEX_TIMEOUT` (`90s`), `EXTRACTOR_VERTEX_MAXTOKENS` (`4096`).
 
-- Razonamiento de Gemini: `EXTRACTOR_VERTEX_PRESUPUESTORAZONAMIENTO` fija el `thinkingBudget` (p. ej. `0` en 2.5 Flash; algunos modelos exigen un mínimo). Sin definir no se envía.
-- Advertencia: con `EXTRACTOR_VERTEX_REGION=global` el servicio registra un aviso y no se garantiza dónde procesa Google los datos. Para residencia de datos usar una región concreta.
+Advertencia: con `EXTRACTOR_VERTEX_REGION=global` el servicio registra un aviso y no se garantiza dónde procesa Google los datos. Para residencia de datos usar una región concreta.
 
 **Proxy y CA**: `EXTRACTOR_PROXY_HOST`, `EXTRACTOR_PROXY_PUERTO` y, si el proxy lo pide, `EXTRACTOR_PROXY_USUARIO` y `EXTRACTOR_PROXY_CLAVE`. Aplica solo a Azure y Vertex (incluido el pedido del token de Google); sin `EXTRACTOR_PROXY_HOST` no se usa proxy. El servicio habilita al arrancar la autenticación Basic para túneles HTTPS (un `-Djdk.http.auth.tunneling.disabledSchemes` explícito tiene prioridad). Si el proxy rechaza la clave, cada solicitud la envía como máximo una vez al pedir el token de Google y dos a Azure/Vertex (el JDK, por defecto, la reenvía hasta 19 veces); aun así, con una clave errónea cada solicitud suma intentos fallidos y la política del proxy puede bloquear la cuenta: corregir la clave antes de reenviar tráfico. Si el proxy inspecciona TLS, guardar la CA corporativa en PEM en `secretos/ca-proxy.pem` y definir `EXTRACTOR_PROXY_CAEXTRA=/run/secretos/ca-proxy.pem`; se suma a las CA del JDK. El pedido del token de Google usa los timeouts por defecto de la librería (~20 s de conexión y ~20 s de lectura) y no reintenta.
 
@@ -58,7 +61,7 @@ Cuenta de servicio: en Google Cloud, IAM y administración, Cuentas de servicio,
 
 ## Actualizar una instalación existente
 
-Si ya usabas Ollama y tu `.env` no tiene `COMPOSE_PROFILES`, agregar `COMPOSE_PROFILES=ollama`: sin esa línea `docker compose up` ya no levanta el contenedor `ollama` y la API responde 503.
+Si ya usabas Ollama y tu `.env` no tiene `COMPOSE_PROFILES`, agregar `COMPOSE_PROFILES=ollama`: sin esa línea Compose deja de gestionar el contenedor `ollama` (no lo crea ni lo recrea; el que ya existe puede seguir corriendo hasta que se detenga) y, sin él, la API responde 503.
 
 ## Puesta en marcha
 
@@ -165,6 +168,8 @@ El tamaño máximo de archivo es 10 MB (`SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE`
 
 ## Cómo medir
 
+El benchmark mide el servicio tal como está configurado: funciona igual con cualquier proveedor. Con Azure o Vertex los documentos del dataset (sintéticos) se envían al proveedor y consumen cuota.
+
 El benchmark (`BenchmarkRunner`) envía cada documento de `benchmark/dataset/` al servicio en marcha, compara contra `esperado.json` y escribe un CSV en `benchmark/resultados/` (no versionado; columnas `documento,forma,modo,qrPresente,status,totalMs,deteccionMs,qrMs,extraccionTextoMs,rasterizacionMs,llmMs,esperaColaMs,aciertos,camposTotales,inventados,omitidos,cumple60s`) con un resumen por modo (p50/p95 de `totalMs`, % de aciertos, inventados, % de documentos <= 60 s).
 
 Dataset completo (12 documentos):
@@ -185,11 +190,13 @@ MVN_DOCKER_ARGS="--network host" ./scripts/mvn.sh -q test-compile exec:java -Dex
   -Dexec.args="--url http://localhost:8080 --filtro retail-a"
 ```
 
-Concurrencia: agregar `--concurrencia N` a `-Dexec.args` y levantar el servicio con `EXTRACTOR_CONCURRENCIA_MAXLLM=N` **y** `OLLAMA_NUM_PARALLEL=N` (si no, las solicitudes esperan en cola o Ollama las serializa). Otras opciones: `--dataset`, `--salida`.
+Concurrencia: agregar `--concurrencia N` a `-Dexec.args` y levantar el servicio con `EXTRACTOR_CONCURRENCIA_MAXLLM=N`; con Ollama, además `OLLAMA_NUM_PARALLEL=N` (si no, Ollama las serializa). Con nube el default ya es `4`; un 503 por cuota agotada indica el límite del proveedor. Otras opciones: `--dataset`, `--salida`, `--modelo`.
 
-Comparar modelos: reiniciar el servicio con otro `EXTRACTOR_OLLAMA_MODELO` (el modelo debe estar descargado en Ollama), volver a correr el benchmark y comparar los CSV. Con CPU y modelos grandes subir `EXTRACTOR_OLLAMA_TIMEOUT` (el benchmark espera hasta 15 min por documento).
+Comparar modelos o proveedores: reiniciar el servicio con otra configuración (`EXTRACTOR_OLLAMA_MODELO`, que debe estar descargado en Ollama; `EXTRACTOR_LLM_PROVEEDOR`; `EXTRACTOR_AZURE_DEPLOYMENT` o `EXTRACTOR_VERTEX_MODELO`), volver a correr el benchmark y comparar los CSV: el nombre de cada CSV y su primera línea (`# modelo=...`) llevan el modelo que informó el servicio (con Azure, el nombre del deployment); `--modelo` lo fija a mano. Con Ollama en CPU y modelos grandes subir `EXTRACTOR_OLLAMA_TIMEOUT` (el benchmark espera hasta 15 min por documento).
 
-### Resultados iniciales
+### Resultados iniciales (Ollama)
+
+Todavía no hay mediciones con Azure OpenAI ni con Vertex AI.
 
 Entorno: notebook solo CPU (Intel Comet Lake-U, 8 hilos, sin GPU), modelo `qwen3-vl:4b`, `EXTRACTOR_OLLAMA_TIMEOUT=600s`, concurrencia 1. **Dataset parcial: solo `retail-a` (3 documentos).**
 
