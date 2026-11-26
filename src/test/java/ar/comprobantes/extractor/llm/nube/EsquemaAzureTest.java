@@ -90,4 +90,31 @@ class EsquemaAzureTest {
         EsquemaAzure.adaptar(original);
         assertThat(original.toString()).isEqualTo(antes);
     }
+
+    private void verificarEstructura(JsonNode schema, List<String> esperadas) {
+        assertThat(schema.path("additionalProperties").asBoolean(true)).isFalse();
+        assertThat(textos(schema.path("required"))).containsExactlyElementsOf(esperadas);
+        assertThat(claves(schema.path("properties"))).containsExactlyElementsOf(esperadas);
+    }
+
+    @Test
+    void camposConNombresDeVocabularioJsonSchemaSiguenEstrictos() {
+        List<CampoSolicitado> campos = List.of(campo("properties"), campo("required"), campo("type"));
+        List<String> nombres = List.of("properties", "required", "type");
+        for (boolean hayQr : new boolean[] {true, false}) {
+            ObjectNode e = EsquemaAzure.adaptar(
+                fuente.para(new SolicitudExtraccion(campos, campos), hayQr));
+            JsonNode props = e.path("properties");
+            verificarEstructura(e, hayQr ? List.of("cabecera", "clavesQr", "detalle") : List.of("cabecera", "detalle"));
+            verificarEstructura(props.path("cabecera"), nombres);
+            nombres.forEach(n -> assertThat(props.path("cabecera").path("properties").path(n).path("type").toString())
+                .isEqualTo("[\"string\",\"null\"]"));
+            verificarEstructura(props.path("detalle").path("items"), nombres);
+            if (hayQr) {
+                verificarEstructura(props.path("clavesQr"), nombres);
+                nombres.forEach(n -> assertThat(props.path("clavesQr").path("properties").path(n).path("type").toString())
+                    .isEqualTo("[\"array\",\"null\"]"));
+            }
+        }
+    }
 }

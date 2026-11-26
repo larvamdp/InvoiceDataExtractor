@@ -60,6 +60,7 @@ class AzureOpenAiLlmClienteTest {
 
     private PromptLlm prompt(List<String> imagenes) {
         ObjectNode esquema = new ObjectMapper().createObjectNode().put("type", "object");
+        esquema.putObject("properties").putObject("cabecera").put("type", "string");
         return new PromptLlm("sistema", "usuario", imagenes, esquema);
     }
 
@@ -81,6 +82,8 @@ class AzureOpenAiLlmClienteTest {
             .withRequestBody(matchingJsonPath("$.response_format.type", equalTo("json_schema")))
             .withRequestBody(matchingJsonPath("$.response_format.json_schema.name", equalTo("extraccion")))
             .withRequestBody(matchingJsonPath("$.response_format.json_schema.strict", equalTo("true")))
+            .withRequestBody(matchingJsonPath("$.response_format.json_schema.schema.additionalProperties",
+                equalTo("false")))
             .withRequestBody(matchingJsonPath("$.temperature", equalTo("0")))
             .withRequestBody(matchingJsonPath("$.max_completion_tokens", equalTo("4096")))
             .withRequestBody(notMatching("(?s).*reasoning_effort.*"))
