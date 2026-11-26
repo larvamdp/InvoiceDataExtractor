@@ -34,3 +34,7 @@ benchmark/resultados/
 
 # Configuración local (puede contener valores propios del entorno)
 .env
+
+# Credenciales montadas en el contenedor (cuenta de servicio, CA del proxy)
+secretos/*
+!secretos/.gitkeep

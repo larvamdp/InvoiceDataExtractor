@@ -96,6 +96,42 @@ class ExtractorPropertiesTest {
     }
 
     @Test
+    void variablesVaciasReenviadasPorComposeSeComportanComoSinDefinir() {
+        Map<String, Object> vacias = new java.util.LinkedHashMap<>();
+        for (String v : new String[] {"EXTRACTOR_LLM_PROVEEDOR", "EXTRACTOR_CONCURRENCIA_MAXLLM",
+            "EXTRACTOR_AZURE_ENDPOINT", "EXTRACTOR_AZURE_DEPLOYMENT", "EXTRACTOR_AZURE_APIKEY",
+            "EXTRACTOR_AZURE_APIVERSION", "EXTRACTOR_AZURE_TIMEOUT", "EXTRACTOR_AZURE_MAXTOKENS",
+            "EXTRACTOR_AZURE_RAZONAMIENTO", "EXTRACTOR_VERTEX_PROYECTO", "EXTRACTOR_VERTEX_REGION",
+            "EXTRACTOR_VERTEX_MODELO", "EXTRACTOR_VERTEX_CREDENCIALES", "EXTRACTOR_VERTEX_TIMEOUT",
+            "EXTRACTOR_VERTEX_MAXTOKENS", "EXTRACTOR_VERTEX_PRESUPUESTORAZONAMIENTO",
+            "EXTRACTOR_PROXY_HOST", "EXTRACTOR_PROXY_PUERTO", "EXTRACTOR_PROXY_USUARIO",
+            "EXTRACTOR_PROXY_CLAVE", "EXTRACTOR_PROXY_CAEXTRA"}) {
+            vacias.put(v, "");
+        }
+        // Primitivos (int/boolean) rompen el binding con valor vacío y un String vacío pisa su default:
+        // compose reenvía estas con default explícito (no vacío).
+        for (String v : new String[] {"EXTRACTOR_AZURE_MAXTOKENS", "EXTRACTOR_AZURE_RAZONAMIENTO",
+            "EXTRACTOR_VERTEX_MAXTOKENS", "EXTRACTOR_AZURE_APIVERSION"}) {
+            vacias.remove(v);
+        }
+        runner.withInitializer(ctx -> ctx.getEnvironment().getPropertySources().addFirst(
+                new SystemEnvironmentPropertySource("systemEnvironment", vacias)))
+            .run(ctx -> {
+                assertThat(ctx).hasNotFailed();
+                var p = ctx.getBean(ExtractorProperties.class);
+                assertThat(p.proveedor()).isEqualTo(ProveedorLlm.OLLAMA);
+                assertThat(p.maxLlmEfectivo()).isEqualTo(1);
+                assertThat(p.azure().timeout()).isEqualTo(Duration.ofSeconds(90));
+                assertThat(p.vertex().timeout()).isEqualTo(Duration.ofSeconds(90));
+                assertThat(p.vertex().presupuestoRazonamiento()).isNull();
+                assertThat(p.vertex().credenciales()).isNull();
+                assertThat(p.proxy().activo()).isFalse();
+                assertThat(p.proxy().puerto()).isNull();
+                assertThat(p.proxy().caExtra()).isNull();
+            });
+    }
+
+    @Test
     void toStringNoMuestraSecretos() {
         var azure = new ExtractorProperties.Azure("https://e", "d", "secreta", "v", Duration.ofSeconds(1), 1, false);
         var proxy = new ExtractorProperties.Proxy("h", 8080, "u", "clavesecreta", null);
