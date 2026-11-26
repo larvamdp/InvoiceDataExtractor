@@ -8,5 +8,93 @@
   <script src="/pruebas/pruebas.js" defer></script>
 </head>
 <body>
+  <header class="encabezado">
+    <h1>Pruebas de extracción</h1>
+    <p class="aviso">Página interna. El documento se envía al proveedor de IA configurado en el servicio.</p>
+  </header>
+
+  <main class="paneles">
+    <section class="panel" aria-label="Configuración">
+      <div class="bloque">
+        <h2>Documento</h2>
+        <label id="zona-documento" class="zona" tabindex="0">
+          <input id="archivo" type="file" accept=".pdf,.jpg,.jpeg,.png" hidden>
+          <span id="zona-texto">Arrastrá un PDF, JPG o PNG, o hacé clic para elegirlo</span>
+        </label>
+      </div>
+
+      <div class="bloque">
+        <div class="titulo-seccion">
+          <h2>Cabecera</h2>
+          <span class="acciones-seccion">
+            <button type="button" class="enlace" data-marcar="cabecera" data-valor="true">Marcar todos</button>
+            <button type="button" class="enlace" data-marcar="cabecera" data-valor="false">Ninguno</button>
+          </span>
+        </div>
+        <ul id="lista-cabecera" class="lista-campos"></ul>
+      </div>
+
+      <div class="bloque">
+        <div class="titulo-seccion">
+          <h2>Detalle</h2>
+          <span class="acciones-seccion">
+            <button type="button" class="enlace" data-marcar="detalle" data-valor="true">Marcar todos</button>
+            <button type="button" class="enlace" data-marcar="detalle" data-valor="false">Ninguno</button>
+          </span>
+        </div>
+        <ul id="lista-detalle" class="lista-campos"></ul>
+      </div>
+
+      <div class="bloque">
+        <button type="button" id="abrir-propio" class="enlace">+ campo propio</button>
+        <form id="form-propio" class="form-propio" hidden novalidate>
+          <label>Nombre <input name="nombre" required placeholder="miCampo"></label>
+          <label>Sección
+            <select name="seccion">
+              <option value="cabecera">Cabecera</option>
+              <option value="detalle">Detalle</option>
+            </select>
+          </label>
+          <label>Etiquetas <input name="etiquetas" placeholder="Separadas por coma"></label>
+          <label>Descripción <input name="descripcion"></label>
+          <label>Tipo
+            <select name="tipo">
+              <option>TEXTO</option><option>NUMERO</option><option>IMPORTE</option><option>FECHA</option><option>CUIT</option>
+            </select>
+          </label>
+          <p id="error-propio" class="error-campo" role="alert"></p>
+          <div class="botones">
+            <button type="submit">Agregar</button>
+            <button type="button" id="cerrar-propio" class="secundario">Cancelar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="botones">
+        <button type="button" id="extraer" disabled>Extraer</button>
+        <button type="button" id="cancelar" class="secundario" hidden>Cancelar</button>
+        <button type="button" id="copiar" class="secundario">Copiar solicitud JSON</button>
+        <span id="estado" class="estado" aria-live="polite"></span>
+      </div>
+      <textarea id="solicitud-manual" class="solicitud-manual" readonly hidden aria-label="Solicitud JSON"></textarea>
+    </section>
+
+    <section class="panel" aria-label="Resultado">
+      <div id="resumen" class="resumen">Todavía no hay resultados.</div>
+      <div id="error" class="error" role="alert" hidden></div>
+      <div id="resultado" class="resultado">
+        <nav class="pestanas" role="tablist">
+          <button type="button" role="tab" data-pestana="cabecera" aria-selected="true">Cabecera</button>
+          <button type="button" role="tab" data-pestana="detalle" aria-selected="false">Detalle</button>
+          <button type="button" role="tab" data-pestana="json" aria-selected="false">JSON</button>
+          <button type="button" role="tab" data-pestana="tiempos" aria-selected="false">Tiempos</button>
+        </nav>
+        <div id="pestana-cabecera" class="contenido-pestana"></div>
+        <div id="pestana-detalle" class="contenido-pestana" hidden></div>
+        <div id="pestana-json" class="contenido-pestana" hidden><pre id="json"></pre></div>
+        <div id="pestana-tiempos" class="contenido-pestana" hidden></div>
+      </div>
+    </section>
+  </main>
 </body>
 </html>
