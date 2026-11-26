@@ -26,7 +26,7 @@ public final class ErroresNube {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String MSG_NO_DISPONIBLE = "El servicio de IA no está disponible.";
     private static final String MSG_TIMEOUT = "El modelo excedió el tiempo máximo de respuesta.";
-    private static final String MSG_CUOTA = "El proveedor de IA agotó la cuota.";
+    private static final String MSG_CUOTA = "Se alcanzó el límite de uso del proveedor de IA.";
     private static final String MSG_BLOQUEADO = "El proveedor de IA bloqueó el contenido.";
 
     private ErroresNube() {

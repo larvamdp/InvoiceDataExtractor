@@ -47,7 +47,8 @@ class ErroresNubeTest {
     @Test
     void cuota429ConSegundos() {
         ExtraccionException r = traducir(http(429, retryAfter("30"), ""));
-        assertThat(r).isInstanceOf(LlmCuotaAgotadaException.class);
+        assertThat(r).isInstanceOf(LlmCuotaAgotadaException.class)
+            .hasMessage("Se alcanzó el límite de uso del proveedor de IA.");
         assertThat(((LlmCuotaAgotadaException) r).retryAfterSegundos()).isEqualTo(30L);
     }
 
