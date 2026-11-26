@@ -38,3 +38,6 @@ benchmark/resultados/
 # Credenciales montadas en el contenedor (cuenta de servicio, CA del proxy)
 secretos/*
 !secretos/.gitkeep
+
+# Notas locales de pendientes (no se versionan)
+PENDIENTES.md
