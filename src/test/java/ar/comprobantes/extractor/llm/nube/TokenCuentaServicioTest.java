@@ -9,6 +9,7 @@ import ar.comprobantes.extractor.error.LlmNoDisponibleException;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import java.net.Authenticator;
+import java.time.Duration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
@@ -64,7 +65,51 @@ class TokenCuentaServicioTest {
     @Test
     void tokenFallaEs503() throws Exception {
         proxy.stubFor(post(urlEqualTo("/token")).willReturn(serverError()));
+        long t0 = System.nanoTime();
         assertThatThrownBy(() -> crear().token()).isInstanceOf(LlmNoDisponibleException.class);
+        assertThat(Duration.ofNanos(System.nanoTime() - t0)).isLessThan(Duration.ofSeconds(4));
+        proxy.verify(1, postRequestedFor(urlEqualTo("/token")));
+    }
+
+    @Test
+    void tokenConCuota429SinReintentos() throws Exception {
+        proxy.stubFor(post(urlEqualTo("/token")).willReturn(aResponse().withStatus(429)));
+        long t0 = System.nanoTime();
+        assertThatThrownBy(() -> crear().token()).isInstanceOf(LlmNoDisponibleException.class);
+        assertThat(Duration.ofNanos(System.nanoTime() - t0)).isLessThan(Duration.ofSeconds(4));
+        proxy.verify(1, postRequestedFor(urlEqualTo("/token")));
+    }
+
+    @Test
+    void caExtraInvalidaFallaAlCrear() throws Exception {
+        Path json = CuentaServicioDePrueba.escribir(dir, "http://oauth.invalid/token");
+        Path pem = dir.resolve("mala.pem");
+        Files.writeString(pem, "no es un certificado");
+        assertThatThrownBy(() -> new TokenCuentaServicio(json,
+            new ExtractorProperties.Proxy("localhost", proxy.port(), null, null, pem)))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("EXTRACTOR_PROXY_CAEXTRA");
+    }
+
+    @Test
+    void httpsPorTunelConAutenticacion() throws Exception {
+        Path p12 = Path.of(getClass().getResource("/tls/servidor.p12").toURI());
+        WireMockServer https = new WireMockServer(WireMockConfiguration.options().dynamicPort().dynamicHttpsPort()
+            .keystorePath(p12.toString()).keystorePassword("changeit").keyManagerPassword("changeit")
+            .keystoreType("PKCS12"));
+        https.start();
+        try (ProxyConnectDePrueba tunel = new ProxyConnectDePrueba("Basic dTpj", https.httpsPort())) {
+            https.stubFor(post(urlEqualTo("/token")).willReturn(okJson(TOKEN_OK)));
+            Path json = CuentaServicioDePrueba.escribir(dir, "https://localhost:" + https.httpsPort() + "/token");
+            Path ca = Path.of(getClass().getResource("/tls/ca-prueba.pem").toURI());
+            TokenCuentaServicio t = new TokenCuentaServicio(json,
+                new ExtractorProperties.Proxy("localhost", tunel.puerto(), "u", "c", ca));
+            assertThat(t.token()).isEqualTo("tok-1");
+            assertThat(tunel.connectAutenticados.get()).isEqualTo(1);
+            https.verify(1, postRequestedFor(urlEqualTo("/token")));
+        } finally {
+            https.stop();
+        }
     }
 
     @Test

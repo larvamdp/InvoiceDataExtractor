@@ -30,16 +30,7 @@ public final class HttpNube {
             if (proxy.usuario() != null && !proxy.usuario().isBlank()) {
                 // Basic ante proxy/túnel lo habilita ExtractorApplication.habilitarBasicEnProxy() al arrancar:
                 // el JDK lee esas propiedades una sola vez, al construir el primer HttpClient.
-                String clave = proxy.clave() == null ? "" : proxy.clave();
-                builder.authenticator(new Authenticator() {
-                    @Override
-                    protected PasswordAuthentication getPasswordAuthentication() {
-                        if (getRequestorType() != RequestorType.PROXY) {
-                            return null;
-                        }
-                        return new PasswordAuthentication(proxy.usuario(), clave.toCharArray());
-                    }
-                });
+                builder.authenticator(autenticadorDeProxy(proxy));
             }
         }
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(builder.build());
@@ -52,5 +43,20 @@ public final class HttpNube {
             return Proxy.NO_PROXY;
         }
         return new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxy.host(), proxy.puerto()));
+    }
+
+    /** Authenticator que entrega usuario/clave del proxy y responde solo a pedidos de tipo PROXY. */
+    public static Authenticator autenticadorDeProxy(ExtractorProperties.Proxy proxy) {
+        String usuario = proxy.usuario();
+        char[] clave = (proxy.clave() == null ? "" : proxy.clave()).toCharArray();
+        return new Authenticator() {
+            @Override
+            protected PasswordAuthentication getPasswordAuthentication() {
+                if (getRequestorType() != RequestorType.PROXY) {
+                    return null;
+                }
+                return new PasswordAuthentication(usuario, clave.clone());
+            }
+        };
     }
 }

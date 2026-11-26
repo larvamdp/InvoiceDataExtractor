@@ -10,7 +10,6 @@ import com.google.auth.oauth2.ServiceAccountCredentials;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Authenticator;
-import java.net.PasswordAuthentication;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -33,15 +32,19 @@ public class TokenCuentaServicio implements ProveedorToken {
             throw new IllegalStateException(PREFIJO + "el archivo de credenciales no existe");
         }
         if (hayProxy && proxy.usuario() != null && !proxy.usuario().isBlank()) {
-            instalarAutenticadorDeProxy(proxy.usuario(), proxy.clave() == null ? "" : proxy.clave());
+            Authenticator.setDefault(HttpNube.autenticadorDeProxy(proxy));
         }
-        HttpTransportFactory fabrica = () -> crearTransporte(proxy);
+        // Se construye una sola vez: una CA extra inválida falla al arrancar, no dentro de token().
+        HttpTransport transporte = crearTransporte(proxy);
+        HttpTransportFactory fabrica = () -> transporte;
         try (InputStream in = Files.newInputStream(credenciales)) {
             GoogleCredentials cargadas = GoogleCredentials.fromStream(in, fabrica);
             if (!(cargadas instanceof ServiceAccountCredentials)) {
                 throw new IllegalStateException(PREFIJO + "el archivo no es una cuenta de servicio");
             }
-            this.credenciales = cargadas.createScoped(List.of(SCOPE));
+            // Sin reintentos internos de la librería (también reintentaría 429): un fallo se informa tal cual.
+            this.credenciales = ((ServiceAccountCredentials) cargadas.createScoped(List.of(SCOPE)))
+                .createWithCustomRetryStrategy(false);
         } catch (IllegalStateException e) {
             throw e;
         } catch (IOException | RuntimeException e) {
@@ -56,20 +59,8 @@ public class TokenCuentaServicio implements ProveedorToken {
                 .trustCertificates(ConfianzaTls.keyStore(proxy == null ? null : proxy.caExtra()))
                 .build();
         } catch (java.security.GeneralSecurityException e) {
-            throw new IllegalStateException(PREFIJO + "no se pudo preparar la conexión TLS");
+            throw new IllegalStateException("EXTRACTOR_PROXY_CAEXTRA: no se pudo preparar la conexión TLS");
         }
-    }
-
-    private static void instalarAutenticadorDeProxy(String usuario, String clave) {
-        Authenticator.setDefault(new Authenticator() {
-            @Override
-            protected PasswordAuthentication getPasswordAuthentication() {
-                if (getRequestorType() != RequestorType.PROXY) {
-                    return null;
-                }
-                return new PasswordAuthentication(usuario, clave.toCharArray());
-            }
-        });
     }
 
     @Override
