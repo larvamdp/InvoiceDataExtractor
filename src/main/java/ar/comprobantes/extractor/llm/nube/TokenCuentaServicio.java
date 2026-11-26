@@ -69,8 +69,32 @@ public class TokenCuentaServicio implements ProveedorToken {
             credenciales.refreshIfExpired();
             return credenciales.getAccessToken().getTokenValue();
         } catch (IOException | RuntimeException e) {
-            log.warn("no se pudo obtener el token de Google ({})", hayProxy ? "vía proxy" : "directo");
+            registrarFallo(e);
             throw new LlmNoDisponibleException("El servicio de IA no está disponible.");
+        }
+    }
+
+    /** Distingue la causa sin registrar mensajes ni cuerpos de la librería (pueden traer datos de la cuenta). */
+    private void registrarFallo(Exception e) {
+        String via = hayProxy ? "vía proxy" : "directo";
+        Integer status = null;
+        for (Throwable c = e; c != null; c = c.getCause()) {
+            if (c instanceof com.google.api.client.http.HttpResponseException h) {
+                status = h.getStatusCode();
+                break;
+            }
+        }
+        if (status != null && (status == 400 || status == 401)) {
+            log.warn("no se pudo obtener el token de Google ({}): tipo={} status={}: credenciales rechazadas por el proveedor",
+                via, e.getClass().getSimpleName(), status);
+        } else if (status != null) {
+            log.warn("no se pudo obtener el token de Google ({}): tipo={} status={}",
+                via, e.getClass().getSimpleName(), status);
+        } else if (ErroresNube.esFalloDeAutenticacion(e)) {
+            log.warn("no se pudo obtener el token de Google ({}): tipo={}: autenticación rechazada por el proxy o el proveedor",
+                via, e.getClass().getSimpleName());
+        } else {
+            log.warn("no se pudo obtener el token de Google ({}): tipo={}", via, e.getClass().getSimpleName());
         }
     }
 }

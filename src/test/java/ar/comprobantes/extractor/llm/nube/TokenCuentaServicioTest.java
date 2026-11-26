@@ -15,8 +15,12 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
+@ExtendWith(OutputCaptureExtension.class)
 class TokenCuentaServicioTest {
 
     private static final String TOKEN_OK = "{\"access_token\":\"tok-1\",\"expires_in\":3600,\"token_type\":\"Bearer\"}";
@@ -78,6 +82,22 @@ class TokenCuentaServicioTest {
         assertThatThrownBy(() -> crear().token()).isInstanceOf(LlmNoDisponibleException.class);
         assertThat(Duration.ofNanos(System.nanoTime() - t0)).isLessThan(Duration.ofSeconds(4));
         proxy.verify(1, postRequestedFor(urlEqualTo("/token")));
+    }
+
+    @Test
+    void credencialesRechazadasLoguean400SinCuerpo(CapturedOutput out) throws Exception {
+        proxy.stubFor(post(urlEqualTo("/token")).willReturn(aResponse().withStatus(400)
+            .withBody("{\"error\":\"invalid_grant\"}")));
+        assertThatThrownBy(() -> crear().token()).isInstanceOf(LlmNoDisponibleException.class);
+        assertThat(out.getAll()).contains("status=400").contains("credenciales rechazadas por el proveedor")
+            .contains("tipo=").doesNotContain("invalid_grant");
+    }
+
+    @Test
+    void falloDeTokenSinRespuestaHttpNoDiceCredenciales(CapturedOutput out) throws Exception {
+        proxy.stubFor(post(urlEqualTo("/token")).willReturn(serverError()));
+        assertThatThrownBy(() -> crear().token()).isInstanceOf(LlmNoDisponibleException.class);
+        assertThat(out.getAll()).contains("status=500").doesNotContain("credenciales rechazadas");
     }
 
     @Test
