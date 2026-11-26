@@ -29,7 +29,7 @@ public class VertexGeminiLlmCliente implements LlmCliente {
 
     private final ExtractorProperties.Vertex config;
     private final ProveedorToken token;
-    private final boolean hayProxy;
+    private final ExtractorProperties.Proxy proxy;
     private final boolean logPrompts;
     private final ObjectMapper mapper = new ObjectMapper();
     private final RestClient restClient;
@@ -42,8 +42,7 @@ public class VertexGeminiLlmCliente implements LlmCliente {
         this.config = props.vertex();
         this.token = token;
         this.logPrompts = props.debug().logPrompts();
-        ExtractorProperties.Proxy proxy = props.proxy();
-        this.hayProxy = proxy != null && proxy.activo();
+        this.proxy = props.proxy();
         this.restClient = HttpNube.restClient(baseUrl, config.timeout(), proxy);
     }
 
@@ -80,7 +79,7 @@ public class VertexGeminiLlmCliente implements LlmCliente {
                 .retrieve()
                 .body(JsonNode.class);
         } catch (RestClientException e) {
-            throw ErroresNube.traducir(e, PROVEEDOR, config.modelo(), hayProxy);
+            throw ErroresNube.traducir(e, PROVEEDOR, config.modelo(), proxy);
         }
         long ms = (System.nanoTime() - inicio) / 1_000_000;
         if (respuesta == null) {

@@ -25,7 +25,7 @@ public class AzureOpenAiLlmCliente implements LlmCliente {
     private static final String MSG_INVALIDA = "El proveedor de IA no devolvió una respuesta utilizable.";
 
     private final ExtractorProperties.Azure config;
-    private final boolean hayProxy;
+    private final ExtractorProperties.Proxy proxy;
     private final boolean logPrompts;
     private final ObjectMapper mapper = new ObjectMapper();
     private final RestClient restClient;
@@ -33,8 +33,7 @@ public class AzureOpenAiLlmCliente implements LlmCliente {
     public AzureOpenAiLlmCliente(ExtractorProperties props) {
         this.config = props.azure();
         this.logPrompts = props.debug().logPrompts();
-        ExtractorProperties.Proxy proxy = props.proxy();
-        this.hayProxy = proxy != null && proxy.activo();
+        this.proxy = props.proxy();
         this.restClient = HttpNube.restClient(config.endpoint(), config.timeout(), proxy);
     }
 
@@ -63,7 +62,7 @@ public class AzureOpenAiLlmCliente implements LlmCliente {
                 .retrieve()
                 .body(JsonNode.class);
         } catch (RestClientException e) {
-            throw ErroresNube.traducir(e, PROVEEDOR, config.deployment(), hayProxy);
+            throw ErroresNube.traducir(e, PROVEEDOR, config.deployment(), proxy);
         }
         long ms = (System.nanoTime() - inicio) / 1_000_000;
         JsonNode eleccion = respuesta == null ? null : respuesta.path("choices").path(0);

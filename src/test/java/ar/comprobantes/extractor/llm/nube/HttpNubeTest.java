@@ -88,7 +88,7 @@ class HttpNubeTest {
             () -> cliente.get().uri("/v1/x").retrieve().body(String.class));
         servidor.verify(moreThanOrExactly(1), getRequestedFor(urlEqualTo("/v1/x")));
         servidor.verify(0, getRequestedFor(urlEqualTo("/v1/x")).withHeader("Authorization", matching(".*")));
-        assertThat(ErroresNube.traducir((Exception) error, "azure", "gpt", true))
+        assertThat(ErroresNube.traducir((Exception) error, "azure", "gpt", new ExtractorProperties.Proxy("localhost", 1, null, null, null)))
             .isInstanceOf(LlmNoDisponibleException.class);
     }
 

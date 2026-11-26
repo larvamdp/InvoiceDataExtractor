@@ -27,6 +27,8 @@ import org.springframework.http.HttpStatusCode;
 @ExtendWith(OutputCaptureExtension.class)
 class ErroresNubeTest {
 
+    private static final ar.comprobantes.extractor.config.ExtractorProperties.Proxy PROXY =
+        new ar.comprobantes.extractor.config.ExtractorProperties.Proxy("proxy.corp", 3128, "u", "SECRETO", null);
     private static final String MSG = "El servicio de IA no está disponible.";
 
     private static HttpClientErrorException http(int status, HttpHeaders h, String cuerpo) {
@@ -41,7 +43,7 @@ class ErroresNubeTest {
     }
 
     private static ExtraccionException traducir(Exception e) {
-        return ErroresNube.traducir(e, "azure", "gpt", false);
+        return ErroresNube.traducir(e, "azure", "gpt", null);
     }
 
     @Test
@@ -139,11 +141,11 @@ class ErroresNubeTest {
     @Test
     void sinConexion(CapturedOutput out) {
         ResourceAccessException e = new ResourceAccessException("SECRETO");
-        assertThat(ErroresNube.traducir(e, "azure", "gpt", false)).isInstanceOf(LlmNoDisponibleException.class)
+        assertThat(ErroresNube.traducir(e, "azure", "gpt", null)).isInstanceOf(LlmNoDisponibleException.class)
             .hasMessage(MSG);
         assertThat(out.getAll()).contains("no se pudo conectar con el proveedor").doesNotContain("SECRETO");
-        assertThat(ErroresNube.traducir(e, "azure", "gpt", true)).isInstanceOf(LlmNoDisponibleException.class);
-        assertThat(out.getAll()).contains("no se pudo conectar (vía proxy)");
+        assertThat(ErroresNube.traducir(e, "azure", "gpt", PROXY)).isInstanceOf(LlmNoDisponibleException.class);
+        assertThat(out.getAll()).contains("no se pudo conectar (vía proxy proxy.corp:3128)").doesNotContain("SECRETO");
     }
 
     @Test
@@ -151,7 +153,7 @@ class ErroresNubeTest {
         for (String m : new String[] {"too many authentication attempts. Limit: 3",
             "No credentials provided SECRETO", "WWW-Authenticate header missing for response code 401"}) {
             ResourceAccessException e = new ResourceAccessException("x", new java.io.IOException(m));
-            assertThat(ErroresNube.traducir(e, "azure", "gpt", true)).isInstanceOf(LlmNoDisponibleException.class)
+            assertThat(ErroresNube.traducir(e, "azure", "gpt", PROXY)).isInstanceOf(LlmNoDisponibleException.class)
                 .hasMessage(MSG);
         }
         assertThat(out.getAll()).contains("autenticación rechazada por el proxy o el proveedor: proveedor=azure")
@@ -164,5 +166,12 @@ class ErroresNubeTest {
         assertThat(traducir(new RestClientException("SECRETO"))).isInstanceOf(LlmNoDisponibleException.class)
             .hasMessage(MSG);
         assertThat(out.getAll()).contains("RestClientException").doesNotContain("SECRETO");
+    }
+
+    @Test
+    void error400LogueaStatusTextualDeVertex(CapturedOutput out) {
+        traducir(http(400, new HttpHeaders(),
+            "{\"error\":{\"code\":400,\"status\":\"INVALID_ARGUMENT\",\"message\":\"SECRETO\"}}"));
+        assertThat(out.getAll()).contains("code=INVALID_ARGUMENT").doesNotContain("SECRETO");
     }
 }

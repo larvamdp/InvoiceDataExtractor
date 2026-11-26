@@ -1,5 +1,6 @@
 package ar.comprobantes.extractor.llm.nube;
 
+import ar.comprobantes.extractor.config.ExtractorProperties;
 import ar.comprobantes.extractor.error.ExtraccionException;
 import ar.comprobantes.extractor.error.LlmCuotaAgotadaException;
 import ar.comprobantes.extractor.error.LlmNoDisponibleException;
@@ -32,7 +33,8 @@ public final class ErroresNube {
     private ErroresNube() {
     }
 
-    public static ExtraccionException traducir(Exception e, String proveedor, String modelo, boolean hayProxy) {
+    public static ExtraccionException traducir(Exception e, String proveedor, String modelo,
+                                              ExtractorProperties.Proxy proxy) {
         if (e instanceof RestClientResponseException r) {
             return traducirRespuesta(r, proveedor, modelo);
         }
@@ -47,8 +49,12 @@ public final class ErroresNube {
                     proveedor, modelo);
                 return new LlmNoDisponibleException(MSG_NO_DISPONIBLE);
             }
-            log.warn(hayProxy ? "no se pudo conectar (vía proxy): proveedor={} modelo={}"
-                : "no se pudo conectar con el proveedor: proveedor={} modelo={}", proveedor, modelo);
+            if (proxy != null && proxy.activo()) {
+                log.warn("no se pudo conectar (vía proxy {}:{}): proveedor={} modelo={}",
+                    proxy.host(), proxy.puerto(), proveedor, modelo);
+            } else {
+                log.warn("no se pudo conectar con el proveedor: proveedor={} modelo={}", proveedor, modelo);
+            }
             return new LlmNoDisponibleException(MSG_NO_DISPONIBLE);
         }
         log.warn("error inesperado del cliente HTTP: proveedor={} modelo={} tipo={}",
@@ -88,8 +94,12 @@ public final class ErroresNube {
 
     private static String errorCode(RestClientResponseException e) {
         try {
-            JsonNode code = MAPPER.readTree(e.getResponseBodyAsString()).path("error").path("code");
-            return code.isTextual() ? code.asText() : null;
+            JsonNode error = MAPPER.readTree(e.getResponseBodyAsString()).path("error");
+            // Azure usa error.code textual; Vertex usa error.code numérico y error.status textual (INVALID_ARGUMENT).
+            if (error.path("code").isTextual()) {
+                return error.path("code").asText();
+            }
+            return error.path("status").isTextual() ? error.path("status").asText() : null;
         } catch (Exception ex) {
             return null;
         }
@@ -113,7 +123,7 @@ public final class ErroresNube {
         }
     }
 
-    private static boolean esFalloDeAutenticacion(Throwable t) {
+    static boolean esFalloDeAutenticacion(Throwable t) {
         for (Throwable c = t; c != null; c = c.getCause()) {
             String m = c instanceof java.io.IOException ? c.getMessage() : null;
             if (m != null && (m.contains("too many authentication attempts") || m.contains("No credentials provided")
