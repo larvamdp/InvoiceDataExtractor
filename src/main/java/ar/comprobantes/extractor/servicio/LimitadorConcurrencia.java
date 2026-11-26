@@ -19,7 +19,7 @@ public class LimitadorConcurrencia {
 
     public LimitadorConcurrencia(ExtractorProperties propiedades) {
         ExtractorProperties.Concurrencia c = propiedades.concurrencia();
-        this.semaforo = new Semaphore(c.maxLlm(), true);
+        this.semaforo = new Semaphore(propiedades.maxLlmEfectivo(), true);
         this.esperaNanos = c.esperaMaxima().toNanos();
     }
 

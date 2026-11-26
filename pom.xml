@@ -19,6 +19,7 @@
     <pdfbox.version>3.0.8</pdfbox.version>
     <zxing.version>3.5.4</zxing.version>
     <wiremock.version>3.13.2</wiremock.version>
+    <google-auth.version>1.30.0</google-auth.version>
   </properties>
 
   <dependencies>
@@ -57,6 +58,11 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>com.google.auth</groupId>
+      <artifactId>google-auth-library-oauth2-http</artifactId>
+      <version>${google-auth.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.wiremock</groupId>
       <artifactId>wiremock-standalone</artifactId>
       <version>${wiremock.version}</version>
@@ -69,6 +75,13 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <argLine>-Djdk.http.auth.tunneling.disabledSchemes= -Djdk.http.auth.proxying.disabledSchemes= -Djdk.httpclient.auth.retrylimit=0 -Dhttp.maxRedirects=2</argLine>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>

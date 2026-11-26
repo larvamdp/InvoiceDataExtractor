@@ -1,11 +1,13 @@
 package ar.comprobantes.extractor.api;
 
 import ar.comprobantes.extractor.error.ExtraccionException;
+import ar.comprobantes.extractor.error.LlmCuotaAgotadaException;
 import jakarta.servlet.ServletException;
 import org.slf4j.Logger;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.util.unit.DataSize;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -34,7 +36,12 @@ public class ManejadorErrores {
 
     @ExceptionHandler(ExtraccionException.class)
     ResponseEntity<ProblemDetail> extraccion(ExtraccionException e) {
-        return responder(e, problema(e.status(), e.titulo(), e.getMessage()));
+        ResponseEntity<ProblemDetail> r = responder(e, problema(e.status(), e.titulo(), e.getMessage()));
+        if (e instanceof LlmCuotaAgotadaException c && c.retryAfterSegundos() != null) {
+            return ResponseEntity.status(r.getStatusCode()).headers(r.getHeaders())
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(c.retryAfterSegundos())).body(r.getBody());
+        }
+        return r;
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
