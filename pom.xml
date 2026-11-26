@@ -19,6 +19,7 @@
     <pdfbox.version>3.0.8</pdfbox.version>
     <zxing.version>3.5.4</zxing.version>
     <wiremock.version>3.13.2</wiremock.version>
+    <google-auth.version>1.30.0</google-auth.version>
   </properties>
 
   <dependencies>
@@ -55,6 +56,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.auth</groupId>
+      <artifactId>google-auth-library-oauth2-http</artifactId>
+      <version>${google-auth.version}</version>
     </dependency>
     <dependency>
       <groupId>org.wiremock</groupId>
