@@ -11,6 +11,8 @@ const ENDPOINT = "/api/v1/extracciones/sync";
 // Igual que spring.servlet.multipart.max-file-size: por encima, Tomcat corta la conexión y el navegador
 // vería un error de red en lugar del 413.
 const TAMANO_MAXIMO = 10 * 1024 * 1024;
+// Punto y coma y no coma: las etiquetas pueden llevar decimales con coma ("IVA 10,5%").
+const SEPARADOR = ";";
 
 const CATALOGO = {
   cabecera: [
@@ -50,6 +52,11 @@ const CATALOGO = {
   ],
 };
 
+// Las etiquetas originales permiten ofrecer "restaurar" después de editarlas.
+for (const seccion of Object.keys(CATALOGO)) {
+  for (const campo of CATALOGO[seccion]) campo.original = campo.etiquetas.slice();
+}
+
 const estado = {
   archivo: null,
   propios: { cabecera: [], detalle: [] },
@@ -64,6 +71,18 @@ function el(etiqueta, texto, clase) {
   if (texto !== undefined && texto !== null) nodo.textContent = String(texto);
   if (clase) nodo.className = clase;
   return nodo;
+}
+
+function separarEtiquetas(texto) {
+  return String(texto || "").split(SEPARADOR).map((e) => e.trim()).filter((e) => e);
+}
+
+function unirEtiquetas(etiquetas) {
+  return (etiquetas || []).join(SEPARADOR + " ");
+}
+
+function etiquetasEditadas(campo) {
+  return unirEtiquetas(campo.etiquetas) !== unirEtiquetas(campo.original);
 }
 
 function campos(seccion) {
@@ -94,11 +113,40 @@ function dibujarListas() {
         });
         li.append(quitar);
       }
-      if (campo.etiquetas && campo.etiquetas.length) label.title = "Etiquetas: " + campo.etiquetas.join(", ");
+      li.append(filaEtiquetas(campo));
       lista.append(li);
     }
   }
   actualizarBotones();
+}
+
+function filaEtiquetas(campo) {
+  const fila = el("div", null, "fila-etiquetas");
+  const entrada = document.createElement("input");
+  entrada.className = "etiquetas";
+  entrada.dataset.campo = campo.nombre;
+  entrada.value = unirEtiquetas(campo.etiquetas);
+  entrada.placeholder = "Sin etiquetas";
+  entrada.setAttribute("aria-label", "Etiquetas de " + campo.nombre);
+  entrada.title = "Textos que el modelo busca en el documento, separados por punto y coma";
+  const restaurar = el("button", "restaurar", "enlace restaurar");
+  restaurar.type = "button";
+  restaurar.dataset.campo = campo.nombre;
+  restaurar.setAttribute("aria-label", "Restaurar etiquetas de " + campo.nombre);
+  restaurar.hidden = !etiquetasEditadas(campo);
+  // Sin redibujar la lista al escribir: así el campo no pierde el foco.
+  entrada.addEventListener("input", () => {
+    campo.etiquetas = separarEtiquetas(entrada.value);
+    restaurar.hidden = !etiquetasEditadas(campo);
+  });
+  restaurar.addEventListener("click", () => {
+    campo.etiquetas = campo.original.slice();
+    entrada.value = unirEtiquetas(campo.etiquetas);
+    restaurar.hidden = true;
+    entrada.focus();
+  });
+  fila.append(entrada, restaurar);
+  return fila;
 }
 
 function marcarSeccion(seccion, valor) {
@@ -157,9 +205,9 @@ function agregarCampoPropio(evento) {
     error.textContent = "Ya existe un campo \"" + nombre + "\" en " + seccion + ".";
     return;
   }
-  const etiquetas = String(datos.get("etiquetas") || "").split(",").map((e) => e.trim()).filter((e) => e);
+  const etiquetas = separarEtiquetas(datos.get("etiquetas"));
   const descripcion = String(datos.get("descripcion") || "").trim();
-  estado.propios[seccion].push({ nombre, tipo, etiquetas, descripcion: descripcion || undefined, marcado: true });
+  estado.propios[seccion].push({ nombre, tipo, etiquetas, original: etiquetas.slice(), descripcion: descripcion || undefined, marcado: true });
   error.textContent = "";
   form.reset();
   form.hidden = true;

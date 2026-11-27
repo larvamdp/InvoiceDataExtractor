@@ -82,7 +82,11 @@ h2 { font-size: 15px; margin: 0 0 8px; }
 .titulo-seccion { display: flex; justify-content: space-between; align-items: baseline; }
 .acciones-seccion { display: flex; gap: 8px; }
 .lista-campos { list-style: none; margin: 0; padding: 0; columns: 2 200px; }
-.lista-campos li { break-inside: avoid; padding: 2px 0; display: flex; align-items: center; gap: 6px; }
+.lista-campos li { break-inside: avoid; padding: 4px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
+.fila-etiquetas { flex-basis: 100%; display: flex; align-items: center; gap: 6px; padding-left: 22px; min-width: 0; }
+input.etiquetas { flex: 1; min-width: 0; padding: 2px 6px; font-size: 12px; color: var(--suave); }
+input.etiquetas:focus { color: var(--texto); }
+.restaurar { font-size: 12px; }
 .lista-campos label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .tipo { color: var(--suave); font-size: 11px; }
 .quitar { color: var(--falta); }
