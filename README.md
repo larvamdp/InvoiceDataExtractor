@@ -121,6 +121,19 @@ Errores en formato RFC 7807:
 | `esperaCola` | Espera del permiso de concurrencia del LLM |
 | `total` | Tiempo total de la solicitud |
 
+## Página de pruebas
+
+`http://localhost:8080/pruebas` es una página interna para probar el servicio con el proveedor configurado. Permite:
+
+- subir un PDF, JPG o PNG;
+- marcar campos de cabecera y de detalle de una lista predefinida y agregar campos propios;
+- ver el resultado en pestañas (cabecera, detalle, JSON completo y tiempos);
+- copiar la solicitud JSON armada para reutilizarla con `curl` o en una integración.
+
+Usa el mismo endpoint `/api/v1/extracciones/sync` que un integrador. Los campos propios no se guardan: se pierden al recargar la página. "Cancelar" solo deja de esperar en el navegador; el servidor termina igual la llamada al modelo.
+
+**Advertencia:** la página está siempre visible y cualquiera que llegue al puerto puede enviar documentos al proveedor de IA configurado (con Azure o Vertex, el contenido sale hacia el proveedor y consume cuota). Si el puerto es accesible desde la red, restringirlo con `EXTRACTOR_PUERTO=127.0.0.1:8080` o con un firewall.
+
 ## Variables de entorno
 
 Toda la configuración está bajo `extractor.*` y se puede sobreescribir con variables de entorno (binding relajado).
